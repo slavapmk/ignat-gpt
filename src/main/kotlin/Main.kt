@@ -20,8 +20,8 @@ import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-const val openaiToken = ""
-const val telegramToken = ""
+const val openaiToken = "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"
+const val telegramToken = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
 const val debugMode = true
 
 fun main() {
@@ -60,7 +60,7 @@ fun main() {
         token = telegramToken
         dispatch {
             message(Filter.Custom {
-                return@Custom (chat.type == "private" || text?.startsWith("Игнат, ") == true || text?.startsWith("Ignat, ") == true)
+                return@Custom text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith("Игнат, ") || text!!.startsWith("Ignat, "))
             }) {
                 val requestMessage = when {
                     message.text?.startsWith("Игнат, ") == true -> message.text?.removePrefix("Игнат, ")
