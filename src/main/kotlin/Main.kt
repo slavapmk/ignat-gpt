@@ -18,20 +18,29 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
-val openaiToken = "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"
+const val openaiToken = ""
+const val telegramToken = ""
+const val debugMode = true
 
 fun main() {
     val httpLoggingInterceptor = HttpLoggingInterceptor()
 
-    httpLoggingInterceptor.level = when (true) {
+    httpLoggingInterceptor.level = when (debugMode) {
         true -> HttpLoggingInterceptor.Level.BODY
         false -> HttpLoggingInterceptor.Level.NONE
     }
 
     val api: OpenaiAPI = Retrofit
         .Builder()
-        .client(OkHttpClient.Builder().addInterceptor(httpLoggingInterceptor).build())
+        .client(
+            OkHttpClient
+                .Builder()
+                .addInterceptor(httpLoggingInterceptor)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .build()
+        )
         .baseUrl("https://api.openai.com")
         .addConverterFactory(GsonConverterFactory.create())
         .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
@@ -48,7 +57,7 @@ fun main() {
 
     val bot = bot {
         logLevel = LogLevel.Error
-        token = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
+        token = telegramToken
         dispatch {
             message(Filter.Custom {
                 return@Custom (chat.type == "private" || text?.startsWith("Игнат, ") == true || text?.startsWith("Ignat, ") == true)
@@ -64,7 +73,7 @@ fun main() {
 
                     if (chat == null)
                         ChatsTable.insert {
-                            it[ChatsTable.id] = message.chat.id
+                            it[id] = message.chat.id
                         }
 
                     var contextId =
@@ -79,6 +88,9 @@ fun main() {
                         }
                     }
 
+                    val contextUsage =
+                        ContextsTable.select { ContextsTable.id eq contextId }.single()[ContextsTable.usage]
+
                     val requestMessages = mutableListOf<OpenaiMessage>()
                     MessagesTable.select { MessagesTable.contextId eq contextId }.forEach {
                         requestMessages.add(
@@ -86,10 +98,23 @@ fun main() {
                                 content = it[MessagesTable.text],
                                 role = it[MessagesTable.type],
                                 name = null
-//                                name = if (it[MessagesTable.type] == "user") it[MessagesTable.senderName] else null
                             )
                         )
                     }
+
+                    val remains = 3500 - contextUsage
+
+                    val maxTokens =
+                        if (remains > 900) 900
+                        else if (remains > 100) remains
+                        else {
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(message.chat.id),
+                                text = "Похоже, ваш диалог слишком длинный. Чтобы начать его заного воспользуйтесь командой /newcontext"
+                            )
+                            return@transaction
+                        }
+
                     if (requestMessages.isEmpty())
                         requestMessages.add(
                             OpenaiMessage(
@@ -109,7 +134,7 @@ fun main() {
                     val request = OpenaiRequest(
                         model = "gpt-3.5-turbo",
                         temperature = 1,
-                        max_tokens = 1000,
+                        max_tokens = maxTokens,
                         top_p = 1,
                         frequency_penalty = 0,
                         presence_penalty = 0,
@@ -135,6 +160,10 @@ fun main() {
                                     it[MessagesTable.contextId] = contextId
                                     it[text] = responseChoice.message.content
                                 }
+
+                                ContextsTable.update({ ContextsTable.id eq contextId }) {
+                                    it[usage] = resp.usage.total_tokens
+                                }
                             }
 
                             bot.sendMessage(
@@ -149,8 +178,15 @@ fun main() {
                 }
             }
             command("start") {
-                val result = bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
-                result.fold({}, {})
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
+            }
+            command("newcontext") {
+                transaction {
+                    ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
+                        it[contextId] = null
+                    }
+                }
+                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Диалог сброшен")
             }
         }
     }
