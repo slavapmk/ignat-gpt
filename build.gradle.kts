@@ -11,12 +11,33 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
+val exposedVersion: String = "0.44.0"
+
 dependencies {
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot", "telegram", "6.1.0")
 
-    implementation("org.ktorm:ktorm-core:3.6.0")
-    implementation("org.ktorm:ktorm-support-sqlite:3.6.0")
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-crypt:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+
+    implementation("org.jetbrains.exposed:exposed-jodatime:$exposedVersion")
+
+    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
+
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:$exposedVersion")
+
+    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-money:$exposedVersion")
     implementation("org.xerial:sqlite-jdbc:3.43.0.0")
+
+    implementation("com.squareup.retrofit2", "retrofit", "2.9.0")
+
+    implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.1")
+    implementation("com.squareup.okhttp3:logging-interceptor:3.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation ("com.squareup.retrofit2:converter-gson:2.3.0")
+    implementation ("com.squareup.retrofit2:adapter-rxjava3:2.9.0")
 }
 
 application {

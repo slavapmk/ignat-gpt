@@ -1,63 +1,158 @@
-import org.ktorm.database.Database
-import org.ktorm.logging.ConsoleLogger
-import org.ktorm.logging.LogLevel
-import org.ktorm.schema.*
+import com.github.kotlintelegrambot.bot
+import com.github.kotlintelegrambot.dispatch
+import com.github.kotlintelegrambot.dispatcher.command
+import com.github.kotlintelegrambot.dispatcher.message
+import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.extensions.filters.Filter
+import com.github.kotlintelegrambot.logging.LogLevel
+import io.OpenaiAPI
+import io.openai.OpenaiMessage
+import io.openai.OpenaiRequest
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
+import io.db.ChatsTable
+import io.db.ContextsTable
+import io.db.MessagesTable
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
+import retrofit2.converter.gson.GsonConverterFactory
 
-object Departments : Table<Nothing>("t_department") {
-    val id = int("id").primaryKey()
-    val name = varchar("name")
-    val location = varchar("location")
-}
+val openaiToken = "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"
 
-object Employees : Table<Nothing>("t_employee") {
-    val id = int("id").primaryKey()
-    val name = varchar("name")
-    val job = varchar("job")
-    val managerId = int("manager_id")
-    val hireDate = date("hire_date")
-    val salary = long("salary")
-    val departmentId = int("department_id")
-}
 fun main() {
-    val database = Database.connect(
+    val httpLoggingInterceptor = HttpLoggingInterceptor()
+
+    httpLoggingInterceptor.level = when (true) {
+        true -> HttpLoggingInterceptor.Level.BODY
+        false -> HttpLoggingInterceptor.Level.NONE
+    }
+
+    val api: OpenaiAPI = Retrofit
+        .Builder()
+        .client(OkHttpClient.Builder().addInterceptor(httpLoggingInterceptor).build())
+        .baseUrl("https://api.openai.com")
+        .addConverterFactory(GsonConverterFactory.create())
+        .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
+        .build().create(OpenaiAPI::class.java)
+
+    Database.connect(
         url = "jdbc:sqlite:database.sqlite",
         driver = "org.sqlite.JDBC",
-        logger = ConsoleLogger(threshold = LogLevel.DEBUG)
     )
+    transaction {
+        addLogger(StdOutSqlLogger)
+        SchemaUtils.create(ChatsTable, MessagesTable, ContextsTable)
+    }
 
-    println()
-//database.ch
-//    database.insert(Chats) {
-//        set(it.id, 1)
-//        set(it.autoTranslate, true)
-//        set(it.contextId, 1)
-//        set(it.darkMode, false)
-//    }
+    val bot = bot {
+        logLevel = LogLevel.Error
+        token = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
+        dispatch {
+            message(Filter.Custom {
+                return@Custom (chat.type == "private" || text?.startsWith("Игнат, ") == true || text?.startsWith("Ignat, ") == true)
+            }) {
+                val requestMessage = when {
+                    message.text?.startsWith("Игнат, ") == true -> message.text?.removePrefix("Игнат, ")
+                    message.text?.startsWith("Ignat, ") == true -> message.text?.removePrefix("Игнат, ")
+                    else -> message.text
+                } ?: ""
 
-//    val bot = bot {
-//        logLevel = LogLevel.Error
-//        token = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
-//        dispatch {
-//            message(Filter.Custom {
-//                return@Custom (chat.type == "private" || text?.startsWith("Игнат, ") == true || text?.startsWith("Ignat, ") == true)
-//            }) {
-//                val request = when {
-//                    message.text?.startsWith("Игнат, ") == true -> message.text?.removePrefix("Игнат, ")
-//                    message.text?.startsWith("Ignat, ") == true -> message.text?.removePrefix("Игнат, ")
-//                    else -> message.text
-//                }
-//
-//            }
-//            command("start") {
-////                println("Message")
-//                val result = bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Hi there!")
-//                result.fold({
-////                    println("Message sent")
-//                }, {
-////                    println("Message not sent")
-//                })
-//            }
-//        }
-//    }
-//    bot.startPolling()
+                transaction {
+                    val chat = ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()
+
+                    if (chat == null)
+                        ChatsTable.insert {
+                            it[ChatsTable.id] = message.chat.id
+                        }
+
+                    var contextId =
+                        chat?.get(ChatsTable.contextId)
+
+                    if (contextId == null) {
+                        contextId = ContextsTable.insert {
+                            it[chatId] = message.chat.id
+                        }[ContextsTable.id]
+                        ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
+                            it[ChatsTable.contextId] = contextId
+                        }
+                    }
+
+                    val requestMessages = mutableListOf<OpenaiMessage>()
+                    MessagesTable.select { MessagesTable.contextId eq contextId }.forEach {
+                        requestMessages.add(
+                            OpenaiMessage(
+                                content = it[MessagesTable.text],
+                                role = it[MessagesTable.type],
+                                name = null
+//                                name = if (it[MessagesTable.type] == "user") it[MessagesTable.senderName] else null
+                            )
+                        )
+                    }
+                    if (requestMessages.isEmpty())
+                        requestMessages.add(
+                            OpenaiMessage(
+                                "You are telegram chatbot",
+                                null,
+                                "system"
+                            )
+                        )
+                    val senderName = (message.senderChat?.firstName ?: "") + " " + (message.senderChat?.lastName ?: "")
+                    requestMessages.add(
+                        OpenaiMessage(
+                            requestMessage,
+                            null,
+                            "user"
+                        )
+                    )
+                    val request = OpenaiRequest(
+                        model = "gpt-3.5-turbo",
+                        temperature = 1,
+                        max_tokens = 1000,
+                        top_p = 1,
+                        frequency_penalty = 0,
+                        presence_penalty = 0,
+                        messages = requestMessages
+                    )
+                    MessagesTable.insert {
+                        it[MessagesTable.senderName] = senderName
+                        it[type] = "user"
+                        it[MessagesTable.contextId] = contextId
+                        it[text] = requestMessage
+                    }
+                    api.request(
+                        "Bearer $openaiToken",
+                        request
+                    ).subscribe(
+                        { resp ->
+                            println("Success $resp")
+                            val responseChoice = resp.choices[0]
+
+                            transaction {
+                                MessagesTable.insert {
+                                    it[type] = "assistant"
+                                    it[MessagesTable.contextId] = contextId
+                                    it[text] = responseChoice.message.content
+                                }
+                            }
+
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(message.chat.id),
+                                text = responseChoice.message.content
+                            )
+                        },
+                        {
+                            println("Error $it")
+                        }
+                    )
+                }
+            }
+            command("start") {
+                val result = bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
+                result.fold({}, {})
+            }
+        }
+    }
+    bot.startPolling()
 }
