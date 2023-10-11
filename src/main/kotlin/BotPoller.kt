@@ -27,9 +27,7 @@ class BotPoller(
         token = telegramToken
         dispatch {
             message(Filter.Custom {
-                return@Custom text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith(
-                    "Игнат, "
-                ) || text!!.startsWith(
+                text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith("Игнат, ") || text!!.startsWith(
                     "Ignat, "
                 ))
             }) {
@@ -55,6 +53,13 @@ class BotPoller(
             message.text?.startsWith("Ignat, ") == true -> message.text?.removePrefix("Игнат, ")
             else -> message.text
         } ?: ""
+        if (requestMessage.isEmpty()) {
+            bot.sendMessage(
+                chatId = ChatId.fromId(message.chat.id),
+                text = "Вы не можете использовать пустой запрос"
+            )
+            return
+        }
 
         var chat: ResultRow? = null
         var contextId: Int? = null
@@ -79,9 +84,7 @@ class BotPoller(
             MessagesTable.select { MessagesTable.contextId eq contextId!! }.forEach {
                 requestMessages.add(
                     OpenaiMessage(
-                        content = it[MessagesTable.text],
-                        role = it[MessagesTable.type],
-                        name = null
+                        content = it[MessagesTable.text], role = it[MessagesTable.type], name = null
                     )
                 )
             }
@@ -98,30 +101,33 @@ class BotPoller(
 
         val remains = 3500 - contextUsage!!
 
-        val maxTokens =
-            if (remains > settingsMaxTokens) settingsMaxTokens
-            else if (remains > 300) remains
-            else {
-                bot.sendMessage(
-                    chatId = ChatId.fromId(message.chat.id),
-                    text = "Похоже, ваш диалог слишком длинный. Чтобы начать его заного воспользуйтесь командой /newcontext"
-                )
-                return
-            }
-
-        if (requestMessages.isEmpty())
-            requestMessages.add(
-                OpenaiMessage(
-                    "You are telegram chatbot",
-                    null,
-                    "system"
-                )
+        val maxTokens = if (remains > settingsMaxTokens) settingsMaxTokens
+        else if (remains > 300) remains
+        else {
+            bot.sendMessage(
+                chatId = ChatId.fromId(message.chat.id),
+                text = "Похоже, ваш диалог слишком длинный. Чтобы начать его заного воспользуйтесь командой /newcontext"
             )
-        val senderName = (message.senderChat?.firstName ?: "") + " " + (message.senderChat?.lastName ?: "")
+            return
+        }
+
+        if (requestMessages.isEmpty()) requestMessages.add(
+            OpenaiMessage(
+                "You are telegram chatbot", null, "system"
+            )
+        )
+
+        var name = message.from?.firstName!!
+        message.from?.lastName?.let {
+            name += "_${it}"
+        }
+
+        val senderName = name.replace(Regex("[^a-zA-Z0-9_-]"), "")
+
         requestMessages.add(
             OpenaiMessage(
                 requestMessage,
-                null,
+                senderName.ifEmpty { null },
                 "user"
             )
         )
@@ -144,9 +150,7 @@ class BotPoller(
         }
         consumer(
             BotGptRequest(
-                request,
-                message,
-                contextId!!
+                request, message, contextId!!
             )
         )
     }
