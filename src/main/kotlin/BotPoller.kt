@@ -117,12 +117,14 @@ class BotPoller(
             )
         )
 
-        var name = message.from?.firstName!!
+        var name = message.from?.firstName ?: ""
         message.from?.lastName?.let {
             name += "_${it}"
         }
 
-        val senderName = name.replace(Regex("[^a-zA-Z0-9_-]"), "")
+        val senderName = with(name.replace(Regex("[^a-zA-Z0-9_-]"), "")) {
+            if (length > 50) substring(0, 50) else this
+        }
 
         requestMessages.add(
             OpenaiMessage(
@@ -148,9 +150,15 @@ class BotPoller(
                 it[text] = requestMessage
             }
         }
+
+        val sendMessage = bot.sendMessage(
+            chatId = ChatId.fromId(message.chat.id),
+            text = "Ваш запрос в обработке"
+        )
+
         consumer(
             BotGptRequest(
-                request, message, contextId!!
+                request, message, sendMessage.get().messageId, contextId!!
             )
         )
     }

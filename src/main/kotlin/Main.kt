@@ -4,6 +4,8 @@ import io.OpenaiAPI
 import io.db.ChatsTable
 import io.db.ContextsTable
 import io.db.MessagesTable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.jetbrains.exposed.sql.*
@@ -18,8 +20,8 @@ const val openaiToken = "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"
 const val telegramToken = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
 const val debugMode = true
 
-fun main() {
-    val queue: Queue<String> = LinkedList()
+suspend fun main() {
+    val queue: MutableList<BotGptRequest> = LinkedList()
 
     val httpLoggingInterceptor = HttpLoggingInterceptor()
 
@@ -54,37 +56,35 @@ fun main() {
     var poller: BotPoller? = null
 
     val consumer: (BotGptRequest) -> Unit = { gptRequest ->
-        api.request(
-            "Bearer $openaiToken",
-            gptRequest.request
-        ).subscribe(
-            { resp ->
-                val responseChoice = resp.choices[0]
+        queue.add(gptRequest)
 
-                transaction {
-                    MessagesTable.insert {
-                        it[type] = "assistant"
-                        it[contextId] = gptRequest.context
-                        it[text] = responseChoice.message.content
-                    }
-
-                    ContextsTable.update({ ContextsTable.id eq gptRequest.context }) {
-                        it[usage] = resp.usage.total_tokens
-                    }
-                }
-
-                poller?.bot?.sendMessage(
-                    chatId = ChatId.fromId(gptRequest.requestMessage.chat.id),
-                    text = responseChoice.message.content
-                )
-            },
-            {
-                println("Error $it")
-            }
+        poller?.bot?.editMessageText(
+            chatId = ChatId.fromId(gptRequest.requestMessage.chat.id),
+            text = "Ваш запрос в обработке. На этот момент людей в очереди: ${queue.size}",
+            messageId = gptRequest.resultMessage
         )
     }
 
     poller = BotPoller(consumer)
 
     poller.bot.startPolling()
+
+    withContext(Dispatchers.IO) {
+        while (true) {
+            if (queue.isEmpty()) {
+                Thread.sleep(1000)
+                continue
+            }
+            val request = queue.removeFirst()
+
+            // TODO WORK
+            Thread.sleep(5000)
+
+            poller.bot.editMessageText(
+                chatId = ChatId.fromId(request.requestMessage.chat.id),
+                text = "Обработка успешная (почти)",
+                messageId = request.resultMessage
+            )
+        }
+    }
 }
