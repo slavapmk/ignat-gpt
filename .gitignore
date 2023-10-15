@@ -2,3 +2,4 @@
 build/
 .gradle/
 database.sqlite
+settings.json

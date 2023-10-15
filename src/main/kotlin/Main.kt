@@ -19,16 +19,18 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
 
-const val openaiToken = "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"
-const val telegramToken = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
-const val debugMode = true
-
 suspend fun main() {
+    val settingsManager = SettingsManager()
+    if (!settingsManager.readOrInit()) {
+        println("Insert tokens")
+        return
+    }
+
     val queue = ConcurrentLinkedQueue<BotGptRequest>()
 
     val httpLoggingInterceptor = HttpLoggingInterceptor()
 
-    httpLoggingInterceptor.level = when (debugMode) {
+    httpLoggingInterceptor.level = when (settingsManager.debug) {
         true -> HttpLoggingInterceptor.Level.BODY
         false -> HttpLoggingInterceptor.Level.NONE
     }
@@ -68,7 +70,7 @@ suspend fun main() {
         )
     }
 
-    poller = BotPoller(consumer)
+    poller = BotPoller(settingsManager.telegram, consumer)
 
     poller.bot.startPolling()
 
@@ -95,7 +97,7 @@ suspend fun main() {
 
             var resultText = ""
             api
-                .request("Bearer $openaiToken", request.request)
+                .request("Bearer ${settingsManager.openai}", request.request)
                 .blockingSubscribe(
                     { resp ->
                         val responseChoice = resp.choices[0]

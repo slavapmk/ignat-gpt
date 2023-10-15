@@ -20,7 +20,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
 class BotPoller(
-    val consumer: (BotGptRequest) -> Unit,
+    val telegramToken: String,
+    val consumer: (BotGptRequest) -> Unit
 ) {
     val bot: Bot = bot {
         logLevel = LogLevel.Error
