@@ -126,7 +126,7 @@ suspend fun main() {
                 )
 
             thread.interrupt()
-            Thread.sleep((System.currentTimeMillis() - startTime) % 5000)
+            Thread.sleep((System.currentTimeMillis() - startTime) % 5000 - 500)
 
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
