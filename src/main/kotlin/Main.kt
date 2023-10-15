@@ -117,6 +117,7 @@ suspend fun main() {
                     },
                     {
                         resultText = if (it is HttpException) {
+                            if (!settingsManager.debug) println(it.response())
                             when (it.code()) {
                                 429 -> {
                                     retry = true
@@ -125,19 +126,18 @@ suspend fun main() {
                                 else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
                             }
                         } else {
+                            println(it)
                             "Получена неизвестная внутренняя ошибка сервера. Просьба обратиться к администратору"
                         }
-                        println(it)
                     }
                 )
 
             if (retry) {
-                Thread.sleep(9000)
+                Thread.sleep(60000)
                 thread.interrupt()
                 continue
             }
             thread.interrupt()
-
 
             Thread.sleep((System.currentTimeMillis() - startTime) % 5000 - 500)
 

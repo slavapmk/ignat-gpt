@@ -36,6 +36,7 @@ class SettingsManager {
 
         openaiToken = fromJson.openaiToken
         telegramToken = fromJson.telegramToken
+        debugMode = fromJson.debugMode
 
         return true
     }
