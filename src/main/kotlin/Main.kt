@@ -9,18 +9,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.StdOutSqlLogger
-import org.jetbrains.exposed.sql.addLogger
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
-const val openaiToken = "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"
+
+const val openaiToken = "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"
 const val telegramToken = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
 const val debugMode = true
 
@@ -93,7 +92,36 @@ suspend fun main() {
             }
 
             thread.start()
-            Thread.sleep(8000)
+
+            var resultText = ""
+            api
+                .request("Bearer $openaiToken", request.request)
+                .blockingSubscribe(
+                    { resp ->
+                        val responseChoice = resp.choices[0]
+                        transaction {
+                            MessagesTable.insert {
+                                it[type] = responseChoice.message.role
+                                it[contextId] = request.contextId
+                                it[text] = responseChoice.message.content
+                            }
+                            ContextsTable.update({ ContextsTable.id eq request.contextId }) {
+                                it[usage] = resp.usage.total_tokens
+                            }
+                        }
+                        resultText = responseChoice.message.content
+                    },
+                    {
+                        resultText = if (it is HttpException) {
+                            when (it.code()) {
+                                else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
+                            }
+                        } else {
+                            "Получена неизвестная внутренняя ошибка сервера. Просьба обратиться к администратору"
+                        }
+                    }
+                )
+
             thread.interrupt()
 
             queue.poll()
@@ -106,18 +134,19 @@ suspend fun main() {
             }
             poller.bot.editMessageText(
                 chatId = ChatId.fromId(request.requestMessage.chat.id),
-                text = "Обработка успешная (почти)",
+                text = resultText,
                 messageId = request.statusMessageId,
             )
 
-            // Reset writing status
-            poller.bot.deleteMessage(
-                chatId = ChatId.fromId(request.requestMessage.chat.id),
-                messageId = poller.bot.sendMessage(
-                    chatId = ChatId.fromId(request.requestMessage.chat.id),
-                    text = "."
-                ).get().messageId
-            )
+//            // Reset writing status
+//            poller.bot.deleteMessage(
+//                chatId = ChatId.fromId(request.requestMessage.chat.id),
+//                messageId = poller.bot.sendMessage(
+//                    chatId = ChatId.fromId(request.requestMessage.chat.id),
+//                    text = "."
+//                ).get().messageId
+//            )
+
 //            poller.bot.sendMessage(
 //                chatId = ChatId.fromId(request.requestMessage.chat.id),
 //                text = "Обработка успешная (почти)",
