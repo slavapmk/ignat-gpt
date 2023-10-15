@@ -50,7 +50,7 @@ suspend fun main() {
         .build().create(OpenaiAPI::class.java)
 
     Database.connect(
-        url = "jdbc:sqlite:database.sqlite",
+        url = "jdbc:sqlite:storage/database.sqlite",
         driver = "org.sqlite.JDBC",
     )
     transaction {

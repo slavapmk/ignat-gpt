@@ -1,5 +1,4 @@
 .idea/
 build/
 .gradle/
-database.sqlite
-settings.json
+storage/

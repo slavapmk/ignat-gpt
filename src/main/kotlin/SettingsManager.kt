@@ -16,7 +16,7 @@ class SettingsManager {
     val debug get() = debugMode
 
     fun readOrInit(): Boolean {
-        val file = File("settings.json").absoluteFile
+        val file = File("storage/settings.json").absoluteFile
 
         val parentFile = file.parentFile
         if (!file.exists() || !parentFile.exists()) {
