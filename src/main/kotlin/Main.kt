@@ -77,11 +77,12 @@ suspend fun main() {
     withContext(Dispatchers.IO) {
         while (true) {
             if (queue.isEmpty()) {
-                Thread.sleep(1000)
+                Thread.sleep(500)
                 continue
             }
             val request = queue.first()
 
+            val startTime = System.currentTimeMillis()
             val thread = Thread {
                 while (true) {
                     poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
@@ -125,6 +126,7 @@ suspend fun main() {
                 )
 
             thread.interrupt()
+            Thread.sleep((System.currentTimeMillis() - startTime) % 5000)
 
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
@@ -139,25 +141,6 @@ suspend fun main() {
                 text = resultText,
                 messageId = request.statusMessageId,
             )
-
-//            // Reset writing status
-//            poller.bot.deleteMessage(
-//                chatId = ChatId.fromId(request.requestMessage.chat.id),
-//                messageId = poller.bot.sendMessage(
-//                    chatId = ChatId.fromId(request.requestMessage.chat.id),
-//                    text = "."
-//                ).get().messageId
-//            )
-
-//            poller.bot.sendMessage(
-//                chatId = ChatId.fromId(request.requestMessage.chat.id),
-//                text = "Обработка успешная (почти)",
-//                replyToMessageId = request.requestMessage.messageId
-//            )
-//            poller.bot.deleteMessage(
-//                messageId = request.statusMessageId,
-//                chatId = ChatId.fromId(request.requestMessage.chat.id)
-//            )
         }
     }
 }
