@@ -97,6 +97,7 @@ suspend fun main() {
             thread.start()
 
             var resultText = ""
+            var retry = false
             api
                 .request("Bearer ${settingsManager.openai}", request.request)
                 .blockingSubscribe(
@@ -117,15 +118,27 @@ suspend fun main() {
                     {
                         resultText = if (it is HttpException) {
                             when (it.code()) {
+                                429 -> {
+                                    retry = true
+                                    ""
+                                }
                                 else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
                             }
                         } else {
                             "Получена неизвестная внутренняя ошибка сервера. Просьба обратиться к администратору"
                         }
+                        println(it)
                     }
                 )
 
+            if (retry) {
+                Thread.sleep(9000)
+                thread.interrupt()
+                continue
+            }
             thread.interrupt()
+
+
             Thread.sleep((System.currentTimeMillis() - startTime) % 5000 - 500)
 
             queue.poll()
