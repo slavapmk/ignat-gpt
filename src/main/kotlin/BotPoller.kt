@@ -5,6 +5,7 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.Message
+import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
 import io.BotGptRequest
@@ -20,20 +21,13 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
 class BotPoller(
-    val telegramToken: String,
-    val consumer: (BotGptRequest) -> Unit
+    private val telegramToken: String,
+    private val consumer: (BotGptRequest) -> Unit
 ) {
     val bot: Bot = bot {
         logLevel = LogLevel.Error
         token = telegramToken
         dispatch {
-            message(Filter.Custom {
-                text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith("Игнат, ") || text!!.startsWith(
-                    "Ignat, "
-                ))
-            }) {
-                process(message)
-            }
             command("start") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
             }
@@ -44,6 +38,36 @@ class BotPoller(
                     }
                 }
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Диалог сброшен")
+            }
+            command("profile") {
+                val usage = transaction {
+                    val contextId =
+                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()?.get(ChatsTable.contextId)
+                    if (contextId != null)
+                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.get(ContextsTable.usage)
+                            ?: 0
+                    else 0
+                }
+
+                val text = arrayOf(
+                    "*Язык*: Исходный (функция временно отключена)",
+                    "*DarkGPT*: Выключён (функция временно отключена)",
+                    "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
+                ).joinToString("\n")
+
+                bot.sendMessage(
+                    ChatId.fromId(message.chat.id),
+                    text,
+                    ParseMode.MARKDOWN,
+                    true
+                )
+            }
+            message(Filter.Custom {
+                text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith("Игнат, ") || text!!.startsWith(
+                    "Ignat, "
+                ))
+            }) {
+                process(message)
             }
         }
     }
