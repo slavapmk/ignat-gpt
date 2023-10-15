@@ -20,6 +20,17 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 
+val helpMessage = """
+                            *Это бот-клиент для OpenAI GPT-3.5 (ChatGPT)* - умной текстовой нейросети. Всё что тебе нужно - это отправить сообщение, и я тебе на него отвечу. Я общаюсь в пределе одного диалога, то есть у меня есть своеобразная "памать". Если нужно начать новый диалог, то воспользуйся командой /newcontext.
+                            *Пример:* `Как дела?`
+                            Если вы используете бота в групповом чате, то все запросы выполняйте, обращаясь по моему имени - Игнат 
+                            *Пример:* `Игнат, Как дела?`
+                            *Примечание*: максимальный размер диалога примерно 3500 токенов. Где 1 токен - примерно 4 латинских символа или 1 любой другой, какой как русский, китайский, или символы пунктуации.
+                            (Вы можете использовать команду /profile чтобы узнать, сколько потрачено).
+                            Если ваш диалог слишком длиный, мы вам сообщим, в вы - очищайте его с помощью /newcontext
+                            [Поддержать автора](https://www.donationalerts.com/r/slavapmk)
+                        """.trimIndent()
+
 class BotPoller(
     private val telegramToken: String,
     private val consumer: (BotGptRequest) -> Unit
@@ -37,7 +48,12 @@ class BotPoller(
                         it[contextId] = null
                     }
                 }
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Диалог сброшен")
+                bot.sendMessage(
+                    ChatId.fromId(message.chat.id),
+                    "*Диалог сброшен*. Теперь бот не помнит о чём вы говорили, но у вас снова доступен весь запас в 3500 токенов.",
+                    ParseMode.MARKDOWN,
+                    true
+                )
             }
             command("profile") {
                 val usage = transaction {
@@ -58,6 +74,22 @@ class BotPoller(
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
                     text,
+                    ParseMode.MARKDOWN,
+                    true
+                )
+            }
+            command("help") {
+                bot.sendMessage(
+                    ChatId.fromId(message.chat.id),
+                    helpMessage,
+                    ParseMode.MARKDOWN,
+                    true
+                )
+            }
+            command("start") {
+                bot.sendMessage(
+                    ChatId.fromId(message.chat.id),
+                    helpMessage,
                     ParseMode.MARKDOWN,
                     true
                 )
