@@ -153,7 +153,8 @@ class BotPoller(
 
         val sendMessage = bot.sendMessage(
             chatId = ChatId.fromId(message.chat.id),
-            text = "Ваш запрос в обработке"
+            text = "Ваш запрос в обработке",
+            replyToMessageId = message.messageId
         )
 
         consumer(

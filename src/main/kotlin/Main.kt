@@ -1,3 +1,4 @@
+import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
 import io.BotGptRequest
 import io.OpenaiAPI
@@ -8,12 +9,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.StdOutSqlLogger
+import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.transaction
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
-import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
 const val openaiToken = "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"
@@ -21,7 +25,7 @@ const val telegramToken = "6271637366:AAGi0AdJ8dTIK29RlsO3kR-9ezdNRak39vM"
 const val debugMode = true
 
 suspend fun main() {
-    val queue: MutableList<BotGptRequest> = LinkedList()
+    val queue = ConcurrentLinkedQueue<BotGptRequest>()
 
     val httpLoggingInterceptor = HttpLoggingInterceptor()
 
@@ -60,8 +64,8 @@ suspend fun main() {
 
         poller?.bot?.editMessageText(
             chatId = ChatId.fromId(gptRequest.requestMessage.chat.id),
-            text = "Ваш запрос в обработке. На этот момент людей в очереди: ${queue.size}",
-            messageId = gptRequest.resultMessage
+            text = "Ваш запрос в обработке. На этот момент запросов в очереди: ${queue.size}",
+            messageId = gptRequest.statusMessageId
         )
     }
 
@@ -75,16 +79,54 @@ suspend fun main() {
                 Thread.sleep(1000)
                 continue
             }
-            val request = queue.removeFirst()
+            val request = queue.first()
 
-            // TODO WORK
-            Thread.sleep(5000)
+            val thread = Thread {
+                while (true) {
+                    poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
+                    try {
+                        Thread.sleep(4500)
+                    } catch (e: InterruptedException) {
+                        return@Thread
+                    }
+                }
+            }
 
+            thread.start()
+            Thread.sleep(8000)
+            thread.interrupt()
+
+            queue.poll()
+            for ((index, botGptRequest) in queue.withIndex()) {
+                poller.bot.editMessageText(
+                    messageId = botGptRequest.statusMessageId,
+                    chatId = ChatId.fromId(botGptRequest.requestMessage.chat.id),
+                    text = "Ваш запрос в обработке. На этот момент запросов в очереди: ${index + 1}"
+                )
+            }
             poller.bot.editMessageText(
                 chatId = ChatId.fromId(request.requestMessage.chat.id),
                 text = "Обработка успешная (почти)",
-                messageId = request.resultMessage
+                messageId = request.statusMessageId,
             )
+
+            // Reset writing status
+            poller.bot.deleteMessage(
+                chatId = ChatId.fromId(request.requestMessage.chat.id),
+                messageId = poller.bot.sendMessage(
+                    chatId = ChatId.fromId(request.requestMessage.chat.id),
+                    text = "."
+                ).get().messageId
+            )
+//            poller.bot.sendMessage(
+//                chatId = ChatId.fromId(request.requestMessage.chat.id),
+//                text = "Обработка успешная (почти)",
+//                replyToMessageId = request.requestMessage.messageId
+//            )
+//            poller.bot.deleteMessage(
+//                messageId = request.statusMessageId,
+//                chatId = ChatId.fromId(request.requestMessage.chat.id)
+//            )
         }
     }
 }

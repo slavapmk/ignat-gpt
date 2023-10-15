@@ -6,6 +6,6 @@ import io.openai.OpenaiRequest
 data class BotGptRequest (
     val request: OpenaiRequest,
     val requestMessage: Message,
-    val resultMessage: Long,
-    val context: Int
+    val statusMessageId: Long,
+    val contextId: Int
 )
