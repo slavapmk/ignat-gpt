@@ -38,7 +38,7 @@ class BotPoller(
     private val consumer: (BotGptRequest) -> Unit
 ) {
     val bot: Bot = bot {
-        logLevel = LogLevel.Error
+        logLevel = LogLevel.All()
         token = telegramToken
         dispatch {
             command("start") {
