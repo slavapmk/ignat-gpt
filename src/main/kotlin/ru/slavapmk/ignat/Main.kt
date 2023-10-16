@@ -21,8 +21,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
 
+val settingsManager = SettingsManager()
 suspend fun main() {
-    val settingsManager = SettingsManager()
     if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
         println("Insert tokens")
         return
