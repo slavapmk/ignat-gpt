@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
 
 suspend fun main() {
     val settingsManager = SettingsManager()
-    if (!settingsManager.readOrInit()) {
+    if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
         println("Insert tokens")
         return
     }
@@ -123,6 +123,7 @@ suspend fun main() {
                                     retry = true
                                     ""
                                 }
+
                                 else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
                             }
                         } else {
