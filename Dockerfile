@@ -1,9 +1,5 @@
-#FROM bellsoft/liberica-openjre-alpine:17
-#COPY . /app
-#WORKDIR /app
-#CMD ./gradlew build
-#RUN sh -c "./gradlew run"
 FROM gradle:jdk17-alpine
+ENV GRADLE_OPTS="-Dorg.gradle.daemon=false"
 COPY . /app
 WORKDIR /app
 RUN gradle shadowJar
