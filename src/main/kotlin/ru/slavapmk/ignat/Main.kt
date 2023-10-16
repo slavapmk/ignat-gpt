@@ -85,7 +85,7 @@ suspend fun main() {
             val request = queue.first()
 
             val startTime = System.currentTimeMillis()
-            val thread = Thread {
+            val typingStatusThread = Thread {
                 while (true) {
                     poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
                     try {
@@ -96,7 +96,7 @@ suspend fun main() {
                 }
             }
 
-            thread.start()
+            typingStatusThread.start()
 
             var resultText = ""
             var retry = false
@@ -137,10 +137,10 @@ suspend fun main() {
 
             if (retry) {
                 Thread.sleep(60000)
-                thread.interrupt()
+                typingStatusThread.interrupt()
                 continue
             }
-            thread.interrupt()
+            typingStatusThread.interrupt()
 
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
@@ -153,7 +153,7 @@ suspend fun main() {
 
             Thread {
                 try {
-                    val i = ((System.currentTimeMillis() - startTime) % 5000 - 500)
+                    val i = ((System.currentTimeMillis() - startTime) % 5000)
                     Thread.sleep(if (i < 0) 0 else i)
                     poller.bot.editMessageText(
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
