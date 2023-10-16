@@ -142,8 +142,6 @@ suspend fun main() {
             }
             thread.interrupt()
 
-            Thread.sleep((System.currentTimeMillis() - startTime) % 5000 - 500)
-
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
                 poller.bot.editMessageText(
@@ -152,11 +150,20 @@ suspend fun main() {
                     text = "Ваш запрос в обработке. На этот момент запросов в очереди: ${index + 1}"
                 )
             }
-            poller.bot.editMessageText(
-                chatId = ChatId.fromId(request.requestMessage.chat.id),
-                text = resultText,
-                messageId = request.statusMessageId,
-            )
+
+            Thread {
+                try {
+                    val i = ((System.currentTimeMillis() - startTime) % 5000 - 500)
+                    Thread.sleep(if (i < 0) 0 else i)
+                    poller.bot.editMessageText(
+                        chatId = ChatId.fromId(request.requestMessage.chat.id),
+                        text = resultText,
+                        messageId = request.statusMessageId,
+                    )
+                } catch (e: InterruptedException) {
+                    println(e)
+                }
+            }.start()
         }
     }
 }
