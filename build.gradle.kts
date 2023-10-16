@@ -33,6 +33,9 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation ("com.squareup.retrofit2:converter-gson:2.3.0")
     implementation ("com.squareup.retrofit2:adapter-rxjava3:2.9.0")
+
+    implementation ("org.apache.logging.log4j:log4j-core:2.20.0")
+    implementation ("org.apache.logging.log4j:log4j-slf4j2-impl:2.20.0")
 }
 
 application {
