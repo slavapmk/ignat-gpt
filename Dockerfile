@@ -6,5 +6,5 @@
 FROM gradle:jdk21-alpine
 COPY . /app
 WORKDIR /app
-CMD gradle build
-RUN gradle run
+RUN gradle build
+CMD gradle run
