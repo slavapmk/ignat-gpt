@@ -153,7 +153,7 @@ suspend fun main() {
 
             Thread {
                 try {
-                    val i = ((System.currentTimeMillis() - startTime) % 5000)
+                    val i = 5000 - ((System.currentTimeMillis() - startTime) % 5000)
                     Thread.sleep(if (i < 0) 0 else i)
                     poller.bot.editMessageText(
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
