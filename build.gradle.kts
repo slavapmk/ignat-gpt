@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
     application
 }
 
@@ -7,9 +8,7 @@ group = "ru.slavapmk.ignat"
 version = "0.1"
 
 tasks.withType<Jar> {
-    manifest {
-        attributes["Main-Class"] = "ru.slavapmk.ignat.MainKt"
-    }
+    archiveFileName.set("${project.name}.jar")
 }
 
 repositories {
@@ -37,13 +36,13 @@ dependencies {
     implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.1")
     implementation("com.squareup.okhttp3:logging-interceptor:3.9.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation ("com.squareup.retrofit2:converter-gson:2.3.0")
-    implementation ("com.squareup.retrofit2:adapter-rxjava3:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.3.0")
+    implementation("com.squareup.retrofit2:adapter-rxjava3:2.9.0")
 
-    implementation ("org.apache.logging.log4j:log4j-core:2.20.0")
-    implementation ("org.apache.logging.log4j:log4j-slf4j2-impl:2.20.0")
+    implementation("org.apache.logging.log4j:log4j-core:2.20.0")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.20.0")
 }
 
 application {
-    mainClass.set("MainKt")
+    mainClass.set("ru.slavapmk.ignat.MainKt")
 }

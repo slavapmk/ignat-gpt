@@ -6,5 +6,5 @@
 FROM gradle:jdk17-alpine
 COPY . /app
 WORKDIR /app
-RUN gradle build
-CMD gradle run
+RUN gradle shadowJar
+CMD sh -c "java -jar build/libs/IgnatGPT.jar"
