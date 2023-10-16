@@ -17,6 +17,7 @@ import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
 import retrofit2.converter.gson.GsonConverterFactory
+import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
@@ -100,6 +101,7 @@ suspend fun main() {
 
             var resultText = ""
             var retry = false
+            var retryWait = 0L
             api
                 .request("Bearer ${settingsManager.openai}", request.request)
                 .blockingSubscribe(
@@ -123,20 +125,25 @@ suspend fun main() {
                             when (it.code()) {
                                 429 -> {
                                     retry = true
+                                    retryWait = 60000
                                     ""
                                 }
 
                                 else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
                             }
                         } else {
-                            println(it)
-                            "Получена неизвестная внутренняя ошибка сервера. Просьба обратиться к администратору"
+                            if (it is UnknownHostException) {
+                                retry = true
+                                ""
+                            } else {
+                                println(it)
+                                "Получена неизвестная внутренняя ошибка сервера ${it::class.java.name}. Просьба обратиться к администратору"
+                            }
                         }
                     }
                 )
-
             if (retry) {
-                Thread.sleep(60000)
+                Thread.sleep(retryWait)
                 typingStatusThread.interrupt()
                 continue
             }
@@ -153,7 +160,7 @@ suspend fun main() {
 
             Thread {
                 try {
-                    val i = 5000 - ((System.currentTimeMillis() - startTime) % 5000)
+                    val i = (System.currentTimeMillis() - startTime) % 5000
                     Thread.sleep(if (i < 0) 0 else i)
                     poller.bot.editMessageText(
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
@@ -162,6 +169,7 @@ suspend fun main() {
                     )
                 } catch (e: InterruptedException) {
                     println(e)
+                    return@Thread
                 }
             }.start()
         }
