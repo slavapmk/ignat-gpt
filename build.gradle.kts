@@ -6,6 +6,12 @@ plugins {
 group = "ru.slavapmk.ignat"
 version = "0.1"
 
+tasks.withType<Jar> {
+    manifest {
+        attributes["Main-Class"] = "ru.slavapmk.ignat.MainKt"
+    }
+}
+
 repositories {
     mavenCentral()
     maven { url = uri("https://jitpack.io") }

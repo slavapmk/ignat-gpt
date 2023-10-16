@@ -1,4 +1,4 @@
-package io.openai
+package ru.slavapmk.ignat.io.openai
 
 data class OpenaiResponse(
     val choices: List<OpenaiResponseChoice>,

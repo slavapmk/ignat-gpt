@@ -1,4 +1,4 @@
-package io.db
+package ru.slavapmk.ignat.io.db
 
 import org.jetbrains.exposed.sql.Table
 

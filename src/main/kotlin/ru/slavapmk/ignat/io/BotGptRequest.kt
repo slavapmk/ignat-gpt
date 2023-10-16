@@ -1,7 +1,7 @@
-package io
+package ru.slavapmk.ignat.io
 
 import com.github.kotlintelegrambot.entities.Message
-import io.openai.OpenaiRequest
+import ru.slavapmk.ignat.io.openai.OpenaiRequest
 
 data class BotGptRequest (
     val request: OpenaiRequest,

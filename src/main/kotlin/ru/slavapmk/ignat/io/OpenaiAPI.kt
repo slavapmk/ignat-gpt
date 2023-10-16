@@ -1,7 +1,7 @@
-package io
+package ru.slavapmk.ignat.io
 
-import io.openai.OpenaiRequest
-import io.openai.OpenaiResponse
+import ru.slavapmk.ignat.io.openai.OpenaiRequest
+import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import io.reactivex.rxjava3.core.Observable
 import retrofit2.http.Body
 import retrofit2.http.Header

@@ -1,3 +1,5 @@
+package ru.slavapmk.ignat
+
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
@@ -8,12 +10,12 @@ import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
-import io.BotGptRequest
-import io.db.ChatsTable
-import io.db.ContextsTable
-import io.db.MessagesTable
-import io.openai.OpenaiMessage
-import io.openai.OpenaiRequest
+import ru.slavapmk.ignat.io.BotGptRequest
+import ru.slavapmk.ignat.io.db.ChatsTable
+import ru.slavapmk.ignat.io.db.ContextsTable
+import ru.slavapmk.ignat.io.db.MessagesTable
+import ru.slavapmk.ignat.io.openai.OpenaiMessage
+import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select

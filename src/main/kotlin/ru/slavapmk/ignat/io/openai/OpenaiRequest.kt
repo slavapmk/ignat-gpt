@@ -1,4 +1,4 @@
-package io.openai
+package ru.slavapmk.ignat.io.openai
 
 data class OpenaiRequest(
     val frequency_penalty: Int,

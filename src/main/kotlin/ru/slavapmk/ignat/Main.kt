@@ -1,10 +1,12 @@
+package ru.slavapmk.ignat
+
 import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
-import io.BotGptRequest
-import io.OpenaiAPI
-import io.db.ChatsTable
-import io.db.ContextsTable
-import io.db.MessagesTable
+import ru.slavapmk.ignat.io.BotGptRequest
+import ru.slavapmk.ignat.io.OpenaiAPI
+import ru.slavapmk.ignat.io.db.ChatsTable
+import ru.slavapmk.ignat.io.db.ContextsTable
+import ru.slavapmk.ignat.io.db.MessagesTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
