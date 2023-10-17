@@ -2,6 +2,7 @@ package ru.slavapmk.ignat
 
 import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.ParseMode
 import ru.slavapmk.ignat.io.BotGptRequest
 import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.db.ChatsTable
@@ -68,7 +69,8 @@ suspend fun main() {
 
         poller?.bot?.editMessageText(
             chatId = ChatId.fromId(gptRequest.requestMessage.chat.id),
-            text = "Ваш запрос в обработке. На этот момент запросов в очереди: ${queue.size}",
+            text = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: ${queue.size}",
+            parseMode = ParseMode.MARKDOWN,
             messageId = gptRequest.statusMessageId
         )
     }
@@ -143,6 +145,8 @@ suspend fun main() {
                     }
                 )
             if (retry) {
+                if (retryWait != 0L)
+                    println("Retry in ${retryWait.toDouble() / 1000}s")
                 Thread.sleep(retryWait)
                 typingStatusThread.interrupt()
                 continue
@@ -154,7 +158,8 @@ suspend fun main() {
                 poller.bot.editMessageText(
                     messageId = botGptRequest.statusMessageId,
                     chatId = ChatId.fromId(botGptRequest.requestMessage.chat.id),
-                    text = "Ваш запрос в обработке. На этот момент запросов в очереди: ${index + 1}"
+                    text = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: ${index + 1}",
+                    parseMode = ParseMode.MARKDOWN
                 )
             }
 
