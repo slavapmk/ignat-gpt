@@ -69,7 +69,7 @@ suspend fun main() {
 
         poller?.bot?.editMessageText(
             chatId = ChatId.fromId(gptRequest.requestMessage.chat.id),
-            text = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: ${queue.size}",
+            text = Messages.processQueue(queue.size),
             parseMode = ParseMode.MARKDOWN,
             messageId = gptRequest.statusMessageId
         )
@@ -131,15 +131,15 @@ suspend fun main() {
                                     ""
                                 }
 
-                                else -> "Получена неизвестная сетевая ошибка ${it.code()}. Просьба обратиться к администратору"
+                                else -> Messages.errorInternet(it.code())
                             }
                         } else {
                             if (it is UnknownHostException) {
                                 retry = true
-                                ""
+                                Messages.retry
                             } else {
                                 println(it)
-                                "Получена неизвестная внутренняя ошибка сервера ${it::class.java.name}. Просьба обратиться к администратору"
+                                Messages.error(it::class.java.name)
                             }
                         }
                     }
@@ -158,7 +158,7 @@ suspend fun main() {
                 poller.bot.editMessageText(
                     messageId = botGptRequest.statusMessageId,
                     chatId = ChatId.fromId(botGptRequest.requestMessage.chat.id),
-                    text = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: ${index + 1}",
+                    text = Messages.processQueue(index + 1),
                     parseMode = ParseMode.MARKDOWN
                 )
             }

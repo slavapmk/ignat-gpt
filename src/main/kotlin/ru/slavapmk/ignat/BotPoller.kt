@@ -21,17 +21,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-
-val helpMessage = """
-                            *Это бот-клиент для OpenAI GPT-3.5 (ChatGPT)* - умной текстовой нейросети. Всё что тебе нужно - это отправить сообщение, и я тебе на него отвечу. Я общаюсь в пределе одного диалога, то есть у меня есть своеобразная "памать". Если нужно начать новый диалог, то воспользуйся командой /newcontext.
-                            *Пример:* `Как дела?`
-                            Если вы используете бота в групповом чате, то все запросы выполняйте, обращаясь по моему имени - Игнат 
-                            *Пример:* `Игнат, Как дела?`
-                            *Примечание*: максимальный размер диалога примерно 3500 токенов. Где 1 токен - примерно 4 латинских символа или 1 любой другой, какой как русский, китайский, или символы пунктуации.
-                            (Вы можете использовать команду /profile чтобы узнать, сколько потрачено).
-                            Если ваш диалог слишком длиный, мы вам сообщим, в вы - очищайте его с помощью /newcontext
-                            [Поддержать автора](https://www.donationalerts.com/r/slavapmk)
-                        """.trimIndent()
+import ru.slavapmk.ignat.Messages.errorQueryEmpty
+import ru.slavapmk.ignat.Messages.helpMessage
+import ru.slavapmk.ignat.Messages.tooLongContext
 
 class BotPoller(
     private val telegramToken: String,
@@ -100,9 +92,11 @@ class BotPoller(
                 )
             }
             message(Filter.Custom {
-                text != null && !text!!.startsWith("/") && (chat.type == "private" || text!!.startsWith("Игнат, ") || text!!.startsWith(
-                    "Ignat, "
-                ))
+                text != null && !text!!.startsWith("/") && (chat.type == "private" || Messages.namedPrefixes.any {
+                    text?.startsWith(
+                        it
+                    ) == true
+                })
             }) {
                 process(message)
             }
@@ -110,15 +104,14 @@ class BotPoller(
     }
 
     private fun process(message: Message) {
-        val requestMessage = when {
-            message.text?.startsWith("Игнат, ") == true -> message.text?.removePrefix("Игнат, ")
-            message.text?.startsWith("Ignat, ") == true -> message.text?.removePrefix("Игнат, ")
-            else -> message.text
-        } ?: ""
+        val requestMessage = message.text?.removePrefix(
+            Messages.namedPrefixes.find { message.text?.startsWith(it) == true } ?: ""
+        ) ?: ""
+
         if (requestMessage.isEmpty()) {
             bot.sendMessage(
                 chatId = ChatId.fromId(message.chat.id),
-                text = "Вы не можете использовать пустой запрос"
+                text = errorQueryEmpty
             )
             return
         }
@@ -155,7 +148,7 @@ class BotPoller(
         if (contextUsage == null || contextId == null || chat == null) {
             bot.sendMessage(
                 chatId = ChatId.fromId(message.chat.id),
-                text = "Похоже, на стороне бота произошла ошибка доступа к БД, пожалуйста подождите или напишите администратору"
+                text = Messages.errorDbUnknown
             )
         }
 
@@ -168,16 +161,11 @@ class BotPoller(
         else {
             bot.sendMessage(
                 chatId = ChatId.fromId(message.chat.id),
-                text = "Похоже, ваш диалог слишком длинный. Чтобы начать его заного воспользуйтесь командой /newcontext"
+                text = tooLongContext
             )
             return
         }
 
-        if (requestMessages.isEmpty()) requestMessages.add(
-            OpenaiMessage(
-                "You are telegram chatbot", null, "system"
-            )
-        )
 
         var name = message.from?.firstName ?: ""
         message.from?.lastName?.let {
@@ -188,6 +176,22 @@ class BotPoller(
             if (length > 50) substring(0, 50) else this
         }
 
+        if (requestMessages.isEmpty()) {
+            val isPm = message.chat.type == "private"
+            requestMessages.add(
+                OpenaiMessage(
+                    Messages.assistantPrompt(
+                        when (isPm) {
+                            true -> "${message.chat.firstName} ${message.chat.lastName ?: ""}".trim()
+                            false -> message.chat.title ?: ""
+                        },
+                        isPm
+                    ),
+                    null,
+                    "system"
+                )
+            )
+        }
         requestMessages.add(
             OpenaiMessage(
                 requestMessage,
@@ -215,7 +219,7 @@ class BotPoller(
 
         val sendMessage = bot.sendMessage(
             chatId = ChatId.fromId(message.chat.id),
-            text = "Ваш запрос в обработке",
+            text = Messages.process,
             replyToMessageId = message.messageId
         )
 
