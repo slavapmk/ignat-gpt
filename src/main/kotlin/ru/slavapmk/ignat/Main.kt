@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import org.commonmark.parser.Parser
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import retrofit2.HttpException
@@ -24,6 +25,17 @@ import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
+
+fun isMarkdownValid(text: String): Boolean {
+    val parser = Parser.builder().build()
+    return try {
+        parser.parse(text)
+        true
+    } catch (e: Exception) {
+        false
+    }
+}
+
 suspend fun main() {
     if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
         println("Insert tokens")
@@ -171,6 +183,7 @@ suspend fun main() {
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
                         text = resultText,
                         messageId = request.statusMessageId,
+                        parseMode = if (isMarkdownValid(resultText)) ParseMode.MARKDOWN else null
                     )
                 } catch (e: InterruptedException) {
                     println(e)

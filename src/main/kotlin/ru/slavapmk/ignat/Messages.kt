@@ -2,8 +2,6 @@ package ru.slavapmk.ignat
 
 object Messages {
     val botName = "Ignat"
-    val errorDbUnknown =
-        "Похоже, на стороне бота произошла ошибка доступа к БД, пожалуйста подождите или напишите администратору"
     val helpMessage = """
                             *Это бот-клиент для OpenAI GPT-3.5 (ChatGPT)* - умной текстовой нейросети. Всё что тебе нужно - это отправить сообщение, и я тебе на него отвечу. Я общаюсь в пределе одного диалога, то есть у меня есть своеобразная "памать". Если нужно начать новый диалог, то воспользуйся командой /newcontext.
                             *Пример:* `Как дела?`
@@ -18,8 +16,8 @@ object Messages {
     val namedPrefixes = arrayOf("Ignat, ", "Игнат, ")
     val errorQueryEmpty = "Вы не можете использовать пустой запрос"
 
-    val tooLongContext =
-        "Похоже, ваш диалог слишком длинный. Чтобы начать его заного воспользуйтесь командой /newcontext"
+    val tooLongContext = "*Ваш диалог слишком длинный*\n" +
+            "Чтобы начать его заного воспользуйтесь командой /newcontext"
 
     private val assistantPrompt =
         "You are responsible for the chatbot in telegram, which name is $botName. You are in {group_or_pm} \"{chat_name}\""
@@ -35,8 +33,10 @@ object Messages {
 
     val process = "*Ваш запрос в обработке*"
     fun processQueue(i: Int) = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: $i"
-    fun errorInternet(code: Int) = "Получена неизвестная сетевая ошибка $code. Просьба обратиться к администратору"
-    fun error(name: String) = "Получена неизвестная внутренняя ошибка сервера $name. Просьба обратиться к администратору"
+    val errorDb =
+        "*Получена ошибка доступа к БД*\n Пожалуйста подождите или напишите администратору"
+    fun errorInternet(code: Int) = "*Получена неизвестная сетевая ошибка $code*\n Пожалуйста подождите или напишите администратору"
+    fun error(name: String) = "*Получена неизвестная внутренняя ошибка сервера $name*\n Пожалуйста подождите или напишите администратору"
 
     val retry = "Повторение запроса"
 }

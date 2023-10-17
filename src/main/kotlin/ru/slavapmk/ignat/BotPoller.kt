@@ -148,7 +148,8 @@ class BotPoller(
         if (contextUsage == null || contextId == null || chat == null) {
             bot.sendMessage(
                 chatId = ChatId.fromId(message.chat.id),
-                text = Messages.errorDbUnknown
+                text = Messages.errorDb,
+                parseMode = ParseMode.MARKDOWN
             )
         }
 
@@ -161,7 +162,8 @@ class BotPoller(
         else {
             bot.sendMessage(
                 chatId = ChatId.fromId(message.chat.id),
-                text = tooLongContext
+                text = tooLongContext,
+                parseMode = ParseMode.MARKDOWN
             )
             return
         }
@@ -220,7 +222,8 @@ class BotPoller(
         val sendMessage = bot.sendMessage(
             chatId = ChatId.fromId(message.chat.id),
             text = Messages.process,
-            replyToMessageId = message.messageId
+            replyToMessageId = message.messageId,
+            parseMode = ParseMode.MARKDOWN
         )
 
         consumer(
