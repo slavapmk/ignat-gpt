@@ -47,7 +47,7 @@ class BotPoller(
                 }
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
-                    "*Диалог сброшен*. Теперь бот не помнит о чём вы говорили, но у вас снова доступен весь запас в 3500 токенов.",
+                    Messages.reset,
                     ParseMode.MARKDOWN,
                     true
                 )
@@ -62,11 +62,7 @@ class BotPoller(
                     else 0
                 }
 
-                val text = arrayOf(
-                    "*Язык*: Исходный (функция временно отключена)",
-                    "*DarkGPT*: Выключён (функция временно отключена)",
-                    "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
-                ).joinToString("\n")
+                val text = Messages.settings(usage)
 
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
