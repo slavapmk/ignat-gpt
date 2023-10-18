@@ -137,7 +137,7 @@ suspend fun main() {
                     }
                 } catch (e: UnknownHostException) {
                     retry = true
-                    retryWait = 60000
+                    retryWait = 5000
                     Messages.retry
                 } catch (e: Exception) {
                     retry = false
