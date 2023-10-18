@@ -51,4 +51,6 @@ object Messages {
     ).joinToString("\n")
 
     val retry = "Повторение запроса"
+    val restricted: String = "Сервера OpenAI отвергли этого бота, напишите администратору"
+    val overload: String = "Сервера OpenAI перегружены, длительность ответа увеличина"
 }

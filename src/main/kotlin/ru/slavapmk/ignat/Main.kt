@@ -4,24 +4,17 @@ import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
 import ru.slavapmk.ignat.io.BotGptRequest
-import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.db.ChatsTable
 import ru.slavapmk.ignat.io.db.ContextsTable
 import ru.slavapmk.ignat.io.db.MessagesTable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import org.commonmark.parser.Parser
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import retrofit2.HttpException
-import retrofit2.Retrofit
-import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
-import retrofit2.converter.gson.GsonConverterFactory
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
@@ -37,33 +30,14 @@ fun isMarkdownValid(text: String): Boolean {
 }
 
 suspend fun main() {
+    val openaiPoller = OpenaiPoller()
+
     if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
         println("Insert tokens")
         return
     }
 
     val queue = ConcurrentLinkedQueue<BotGptRequest>()
-
-    val httpLoggingInterceptor = HttpLoggingInterceptor()
-
-    httpLoggingInterceptor.level = when (settingsManager.debug) {
-        true -> HttpLoggingInterceptor.Level.BODY
-        false -> HttpLoggingInterceptor.Level.NONE
-    }
-
-    val api: OpenaiAPI = Retrofit
-        .Builder()
-        .client(
-            OkHttpClient
-                .Builder()
-                .addInterceptor(httpLoggingInterceptor)
-                .readTimeout(120, TimeUnit.SECONDS)
-                .build()
-        )
-        .baseUrl("https://api.openai.com")
-        .addConverterFactory(GsonConverterFactory.create())
-        .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
-        .build().create(OpenaiAPI::class.java)
 
     Database.connect(
         url = "jdbc:sqlite:storage/database.sqlite",
@@ -104,7 +78,7 @@ suspend fun main() {
                 while (true) {
                     poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
                     try {
-                        Thread.sleep(4500)
+                        Thread.sleep(5000)
                     } catch (e: InterruptedException) {
                         return@Thread
                     }
@@ -113,57 +87,60 @@ suspend fun main() {
 
             typingStatusThread.start()
 
-            var resultText = ""
             var retry = false
             var retryWait = 0L
-            api
-                .request("Bearer ${settingsManager.openai}", request.request)
-                .blockingSubscribe(
-                    { resp ->
-                        val responseChoice = resp.choices[0]
-                        transaction {
-                            MessagesTable.insert {
-                                it[type] = responseChoice.message.role
-                                it[contextId] = request.contextId
-                                it[text] = responseChoice.message.content
-                            }
-                            ContextsTable.update({ ContextsTable.id eq request.contextId }) {
-                                it[usage] = resp.usage.total_tokens
-                            }
-                        }
-                        resultText = responseChoice.message.content
-                    },
-                    {
-                        resultText = if (it is HttpException) {
-                            if (!settingsManager.debug) println(it.response())
-                            when (it.code()) {
-                                429 -> {
-                                    retry = true
-                                    retryWait = 60000
-                                    ""
-                                }
+            var resultText: String
 
-                                else -> Messages.errorInternet(it.code())
-                            }
-                        } else {
-                            if (it is UnknownHostException) {
-                                retry = true
-                                Messages.retry
-                            } else {
-                                println(it)
-                                Messages.error(it::class.java.name)
-                            }
-                        }
-                    }
-                )
-            if (retry) {
+            do {
                 if (retryWait != 0L)
                     println("Retry in ${retryWait.toDouble() / 1000}s")
                 Thread.sleep(retryWait)
-                typingStatusThread.interrupt()
-                continue
-            }
-            typingStatusThread.interrupt()
+
+                resultText = try {
+                    val resp = openaiPoller.process(
+                        settingsManager.openai,
+                        request
+                    )
+                    retry = false
+                    resp
+                } catch (e: HttpException) {
+                    when (e.code()) {
+                        429 -> {
+                            retry = true
+                            retryWait = 0
+                            Messages.retry
+                        }
+
+                        401 -> {
+                            retry = false
+                            Messages.restricted
+                        }
+
+                        503 -> {
+                            retry = true
+                            retryWait = 1000
+                            Messages.overload
+                        }
+
+                        500 -> {
+                            retry = true
+                            retryWait = 1000
+                            Messages.overload
+                        }
+
+                        else -> {
+                            Messages.errorInternet(e.code())
+                        }
+                    }
+                } catch (e: UnknownHostException) {
+                    retry = true
+                    retryWait = 60000
+                    Messages.retry
+                } catch (e: Exception) {
+                    retry = false
+                    Messages.error(e::class.java.name)
+                }
+            } while (retry)
 
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
@@ -175,10 +152,13 @@ suspend fun main() {
                 )
             }
 
+            typingStatusThread.interrupt()
+
+
+
             Thread {
                 try {
-                    val i = (System.currentTimeMillis() - startTime) % 5000
-                    Thread.sleep(if (i < 0) 0 else i)
+                    Thread.sleep(5000 - ((System.currentTimeMillis() - startTime) % 5000))
                     poller.bot.editMessageText(
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
                         text = resultText,
