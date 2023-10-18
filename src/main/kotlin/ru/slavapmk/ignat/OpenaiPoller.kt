@@ -29,7 +29,7 @@ class OpenaiPoller(val debugMode: Boolean) {
                         this
                     }
                 )
-                .readTimeout(120, TimeUnit.SECONDS)
+                .readTimeout(600, TimeUnit.SECONDS)
                 .build()
         )
         .baseUrl("https://api.openai.com")
