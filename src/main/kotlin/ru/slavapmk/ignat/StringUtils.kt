@@ -26,3 +26,9 @@ fun translit(input: String): String {
 
     return result.toString()
 }
+
+val latin = Regex("[a-zA-Z]")
+
+fun estimatedTokenLength(s: String): Int = with(latin.findAll(s).count()) {
+    (s.length - this) + this / 2
+}

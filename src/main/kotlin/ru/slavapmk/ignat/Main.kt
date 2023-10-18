@@ -15,6 +15,7 @@ import org.commonmark.parser.Parser
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import retrofit2.HttpException
+import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
@@ -90,7 +91,7 @@ suspend fun main() {
 
             typingStatusThread.start()
 
-            var retry = false
+            var retry: Boolean
             var retryWait = 0L
             var resultText: String
 
@@ -107,6 +108,8 @@ suspend fun main() {
                     retry = false
                     resp
                 } catch (e: HttpException) {
+                    retry = false
+                    val error = gson.fromJson(e.message(), OpenaiResponse::class.java).error
                     when (e.code()) {
                         429 -> {
                             retry = true
@@ -114,10 +117,7 @@ suspend fun main() {
                             Messages.retry
                         }
 
-                        401 -> {
-                            retry = false
-                            Messages.restricted
-                        }
+                        401 -> Messages.restricted
 
                         503 -> {
                             retry = true
@@ -131,9 +131,13 @@ suspend fun main() {
                             Messages.overload
                         }
 
-                        else -> {
-                            Messages.errorInternet(e.code())
-                        }
+                        400 ->
+                            if (error?.type == "context_length_exceeded")
+                                Messages.tooLongContext
+                            else
+                                Messages.errorInternet(e.code())
+
+                        else -> Messages.errorInternet(e.code())
                     }
                 } catch (e: UnknownHostException) {
                     retry = true

@@ -151,7 +151,7 @@ class BotPoller(
 
         val settingsMaxTokens = chat?.get(ChatsTable.maxTokens) ?: 1500
 
-        val remains = 3500 - contextUsage!!
+        val remains = 3500 - contextUsage!! - estimatedTokenLength(requestMessage)
 
         val maxTokens = if (remains > settingsMaxTokens) settingsMaxTokens
         else if (remains > 300) remains
