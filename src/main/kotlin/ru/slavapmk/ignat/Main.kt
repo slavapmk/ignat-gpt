@@ -3,6 +3,8 @@ package ru.slavapmk.ignat
 import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
+import io.reactivex.rxjava3.core.Completable
+import io.reactivex.rxjava3.schedulers.Schedulers
 import ru.slavapmk.ignat.io.BotGptRequest
 import ru.slavapmk.ignat.io.db.ChatsTable
 import ru.slavapmk.ignat.io.db.ContextsTable
@@ -15,6 +17,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import retrofit2.HttpException
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
@@ -154,22 +157,20 @@ suspend fun main() {
 
             typingStatusThread.interrupt()
 
-
-
-            Thread {
-                try {
-                    Thread.sleep(5000 - ((System.currentTimeMillis() - startTime) % 5000))
+            Completable
+                .timer(
+                    5000 - ((System.currentTimeMillis() - startTime) % 5000),
+                    TimeUnit.MILLISECONDS,
+                    Schedulers.newThread()
+                )
+                .subscribe {
                     poller.bot.editMessageText(
                         chatId = ChatId.fromId(request.requestMessage.chat.id),
                         text = resultText,
                         messageId = request.statusMessageId,
                         parseMode = if (isMarkdownValid(resultText)) ParseMode.MARKDOWN else null
                     )
-                } catch (e: InterruptedException) {
-                    println(e)
-                    return@Thread
                 }
-            }.start()
         }
     }
 }
