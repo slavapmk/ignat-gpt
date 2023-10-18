@@ -44,11 +44,17 @@ object Messages {
     fun error(name: String) =
         "*Получена неизвестная внутренняя ошибка сервера $name*\n Пожалуйста подождите или напишите администратору"
 
-    fun settings(usage: Int) = arrayOf(
-        "*Язык*: Исходный (функция временно отключена)",
-        "*DarkGPT*: Выключён (функция временно отключена)",
-        "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
-    ).joinToString("\n")
+    val version = "2.0.2"
+    fun settings(usage: Int): String {
+
+        return arrayOf(
+            "*IgnatGPT Kotlin v$version Beta*",
+            "",
+            "*Язык*: Исходный (функция временно отключена)",
+            "*DarkGPT*: Выключён (функция временно отключена)",
+            "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
+        ).joinToString("\n")
+    }
 
     val retry = "Повторение запроса"
     val restricted: String = "Сервера OpenAI отвергли этого бота, напишите администратору"
