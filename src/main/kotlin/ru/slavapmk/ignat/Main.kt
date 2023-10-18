@@ -81,7 +81,7 @@ suspend fun main() {
                 while (true) {
                     poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
                     try {
-                        Thread.sleep(5000)
+                        Thread.sleep(1000)
                     } catch (e: InterruptedException) {
                         return@Thread
                     }
@@ -159,7 +159,7 @@ suspend fun main() {
 
             Completable
                 .timer(
-                    5000 - ((System.currentTimeMillis() - startTime) % 5000),
+                    5000 - ((System.currentTimeMillis() - startTime) % 1000),
                     TimeUnit.MILLISECONDS,
                     Schedulers.newThread()
                 )
