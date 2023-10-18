@@ -170,7 +170,7 @@ class BotPoller(
             name += "_${it}"
         }
 
-        val senderName = with(name.replace(Regex("[^a-zA-Z0-9_-]"), "")) {
+        val senderName = with(translit(name).replace(Regex("[^a-zA-Z0-9_-]"), "")) {
             if (length > 50) substring(0, 50) else this
         }
 
