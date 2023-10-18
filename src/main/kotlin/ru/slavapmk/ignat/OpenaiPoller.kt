@@ -14,7 +14,7 @@ import ru.slavapmk.ignat.io.db.ContextsTable
 import ru.slavapmk.ignat.io.db.MessagesTable
 import java.util.concurrent.TimeUnit
 
-class OpenaiPoller {
+class OpenaiPoller(val debugMode: Boolean) {
     val api: OpenaiAPI = Retrofit
         .Builder()
         .client(
@@ -22,7 +22,7 @@ class OpenaiPoller {
                 .Builder()
                 .addInterceptor(
                     with(HttpLoggingInterceptor()) {
-                        level = when (settingsManager.debug) {
+                        level = when (debugMode) {
                             true -> HttpLoggingInterceptor.Level.BODY
                             false -> HttpLoggingInterceptor.Level.NONE
                         }

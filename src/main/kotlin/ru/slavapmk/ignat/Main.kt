@@ -33,12 +33,12 @@ fun isMarkdownValid(text: String): Boolean {
 }
 
 suspend fun main() {
-    val openaiPoller = OpenaiPoller()
-
     if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
         println("Insert tokens")
         return
     }
+
+    val openaiPoller = OpenaiPoller(settingsManager.debug)
 
     val queue = ConcurrentLinkedQueue<BotGptRequest>()
 
