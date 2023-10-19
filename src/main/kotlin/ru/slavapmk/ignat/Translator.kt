@@ -40,3 +40,37 @@ class Translator(private val debugMode: Boolean) {
             )
         ).blockingSingle()
 }
+
+
+fun main() {
+    val settingsManager1 = SettingsManager()
+    settingsManager1.readOrInit()
+//    println(settingsManager1.yandexToken)
+    val translator = Translator(false)
+    val request = "ПРивет, хуесос"
+
+
+    println(request)
+    println()
+
+    val message = translator.translate(
+        request,
+        settingsManager1.yandexToken,
+        "en",
+        settingsManager1.yandexFolder
+    )
+
+    println(message.translations[0].text)
+
+    println()
+
+    val translate = translator.translate(
+        message.translations[0].text,
+        settingsManager1.yandexToken,
+        message.translations[0].detectedLanguageCode,
+        settingsManager1.yandexFolder
+    )
+
+    println(translate.translations[0].text)
+
+}

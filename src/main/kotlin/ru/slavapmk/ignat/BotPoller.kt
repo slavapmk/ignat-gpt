@@ -5,9 +5,8 @@ import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
-import com.github.kotlintelegrambot.entities.ChatId
-import com.github.kotlintelegrambot.entities.Message
-import com.github.kotlintelegrambot.entities.ParseMode
+import com.github.kotlintelegrambot.entities.*
+import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
 import ru.slavapmk.ignat.io.BotGptRequest
@@ -24,6 +23,7 @@ import org.jetbrains.exposed.sql.update
 import ru.slavapmk.ignat.Messages.errorQueryEmpty
 import ru.slavapmk.ignat.Messages.helpMessage
 import ru.slavapmk.ignat.Messages.tooLongContext
+import java.io.IOException
 
 class BotPoller(
     private val telegramToken: String,
@@ -53,22 +53,35 @@ class BotPoller(
                 )
             }
             command("profile") {
-                val usage = transaction {
-                    val contextId =
-                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()?.get(ChatsTable.contextId)
+                val usageAndChat = transaction {
+                    val chat = ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()?: ChatsTable.insert {
+                        it[id] = message.chat.id
+                    }.resultedValues?.get(0)?:throw IOException("Db error")
+
+                    val contextId = chat[ChatsTable.contextId]
                     if (contextId != null)
-                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.get(ContextsTable.usage)
-                            ?: 0
-                    else 0
+                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
+                            Pair(it[ContextsTable.usage], chat)
+                        } ?: Pair(0, chat)
+                    else Pair(0, chat)
                 }
 
-                val text = Messages.settings(usage)
+                val text = Messages.settings(usageAndChat.first)
 
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
                     text,
                     ParseMode.MARKDOWN,
-                    true
+                    true,
+                    replyMarkup = InlineKeyboardMarkup.create(
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
+                                else "Включить автоперевод",
+                                "TODO" // TODO
+                            )
+                        )
+                    )
                 )
             }
             command("help") {

@@ -8,5 +8,6 @@ object ChatsTable : Table("chats") {
     val autoTranslate = bool("auto_translate").default(false)
     val darkMode = bool("dark_mode").default(false)
     val maxTokens = integer("max_tokens").default(1500)
+    val lastSettings = long("last_settings").nullable()
     override val primaryKey = PrimaryKey(id, name = "Chat_ID")
 }
