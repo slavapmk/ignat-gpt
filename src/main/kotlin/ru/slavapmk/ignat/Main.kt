@@ -39,6 +39,9 @@ suspend fun main() {
         return
     }
 
+    if (settingsManager.yandexToken.isEmpty())
+        println("Yandex translator disabled")
+
     val openaiPoller = OpenaiPoller(settingsManager.debug)
 
     val queue = ConcurrentLinkedQueue<BotGptRequest>()
