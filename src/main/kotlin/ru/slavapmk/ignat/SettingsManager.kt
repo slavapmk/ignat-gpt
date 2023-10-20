@@ -42,6 +42,7 @@ class SettingsManager {
             else yandexIam.iamToken
         }
     val yandexFolder get() = this.yandexAuthFolder
+    val translator get() = enableYandex
 
     val openai get() = openaiToken
     val telegram get() = telegramToken

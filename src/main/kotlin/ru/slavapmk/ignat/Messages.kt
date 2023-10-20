@@ -45,12 +45,14 @@ object Messages {
         "*Получена неизвестная внутренняя ошибка сервера $name*\n Пожалуйста подождите или напишите администратору"
 
     val version = "2.0.2"
-    fun settings(usage: Int): String {
-
+    fun settings(usage: Int, translator: Boolean): String {
         return arrayOf(
             "*IgnatGPT Kotlin v$version Beta*",
             "",
-            "*Язык*: Исходный (функция временно отключена)",
+            "*Язык*: ${
+                if (translator) "Исходный -> Английский -> Исходный"
+                else "Исходный"
+            }",
             "*DarkGPT*: Выключён (функция временно отключена)",
             "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
         ).joinToString("\n")

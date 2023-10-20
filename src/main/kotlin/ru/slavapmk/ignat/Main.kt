@@ -68,7 +68,8 @@ suspend fun main() {
         )
     }
 
-    poller = BotPoller(settingsManager.telegram, consumer)
+    val translator = Translator(settingsManager.debug)
+    poller = BotPoller(settingsManager, consumer, translator)
 
     poller.bot.startPolling()
 
@@ -79,20 +80,6 @@ suspend fun main() {
                 continue
             }
             val request = queue.first()
-
-            val startTime = System.currentTimeMillis()
-            val typingStatusThread = Thread {
-                while (true) {
-                    poller.bot.sendChatAction(ChatId.fromId(request.requestMessage.chat.id), ChatAction.TYPING)
-                    try {
-                        Thread.sleep(1000)
-                    } catch (e: InterruptedException) {
-                        return@Thread
-                    }
-                }
-            }
-
-            typingStatusThread.start()
 
             var retry: Boolean
             var retryWait = 0L
@@ -152,6 +139,14 @@ suspend fun main() {
                 }
             } while (retry)
 
+            if (request.translate)
+                resultText = translator.translate(
+                    resultText,
+                    request.translateTo,
+                    settingsManager.yandexToken,
+                    settingsManager.yandexFolder
+                ).translations.first().text
+
             queue.poll()
             for ((index, botGptRequest) in queue.withIndex()) {
                 poller.bot.editMessageText(
@@ -161,23 +156,12 @@ suspend fun main() {
                     parseMode = ParseMode.MARKDOWN
                 )
             }
-
-            typingStatusThread.interrupt()
-
-            Completable
-                .timer(
-                    5000 - ((System.currentTimeMillis() - startTime) % 1000),
-                    TimeUnit.MILLISECONDS,
-                    Schedulers.newThread()
-                )
-                .subscribe {
-                    poller.bot.editMessageText(
-                        chatId = ChatId.fromId(request.requestMessage.chat.id),
-                        text = resultText,
-                        messageId = request.statusMessageId,
-                        parseMode = if (isMarkdownValid(resultText)) ParseMode.MARKDOWN else null
-                    )
-                }
+            poller.bot.editMessageText(
+                chatId = ChatId.fromId(request.requestMessage.chat.id),
+                text = resultText,
+                messageId = request.statusMessageId,
+                parseMode = if (isMarkdownValid(resultText)) ParseMode.MARKDOWN else null
+            )
         }
     }
 }

@@ -3,18 +3,16 @@ package ru.slavapmk.ignat
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
+import com.github.kotlintelegrambot.dispatcher.callbackQuery
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.message
-import com.github.kotlintelegrambot.entities.*
+import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
+import com.github.kotlintelegrambot.entities.Message
+import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
-import ru.slavapmk.ignat.io.BotGptRequest
-import ru.slavapmk.ignat.io.db.ChatsTable
-import ru.slavapmk.ignat.io.db.ContextsTable
-import ru.slavapmk.ignat.io.db.MessagesTable
-import ru.slavapmk.ignat.io.openai.OpenaiMessage
-import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
@@ -23,23 +21,57 @@ import org.jetbrains.exposed.sql.update
 import ru.slavapmk.ignat.Messages.errorQueryEmpty
 import ru.slavapmk.ignat.Messages.helpMessage
 import ru.slavapmk.ignat.Messages.tooLongContext
+import ru.slavapmk.ignat.io.BotGptRequest
+import ru.slavapmk.ignat.io.db.ChatsTable
+import ru.slavapmk.ignat.io.db.ContextsTable
+import ru.slavapmk.ignat.io.db.MessagesTable
+import ru.slavapmk.ignat.io.openai.OpenaiMessage
+import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import java.io.IOException
 
 class BotPoller(
-    private val telegramToken: String,
-    private val consumer: (BotGptRequest) -> Unit
+    private val settings: SettingsManager,
+    private val consumer: (BotGptRequest) -> Unit,
+    private val translator: Translator?
 ) {
     val bot: Bot = bot {
-        logLevel = when (settingsManager.debug) {
+        logLevel = when (settings.debug) {
             true -> LogLevel.All()
             false -> LogLevel.Error
         }
-        token = telegramToken
+        token = settings.telegram
         dispatch {
             command("start") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
             }
             command("newcontext") {
+                val usageAndChat = transaction {
+                    val chat =
+                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
+                            it[id] = message.chat.id
+                        }.resultedValues?.get(0) ?: throw IOException("Db error")
+
+                    val contextId = chat[ChatsTable.contextId]
+                    if (contextId != null)
+                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
+                            Pair(it[ContextsTable.usage], chat)
+                        } ?: Pair(0, chat)
+                    else Pair(0, chat)
+                }
+                transaction {
+                    return@transaction ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()
+                }?.get(ChatsTable.lastSettings).apply {
+                    if (this == null) return@apply
+                    bot.editMessageText(
+                        chatId = ChatId.fromId(message.chat.id),
+                        messageId = this,
+                        text = Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
+                        replyMarkup = null,
+                        parseMode = ParseMode.MARKDOWN,
+                        disableWebPagePreview = true
+                    )
+                }
+
                 transaction {
                     ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
                         it[contextId] = null
@@ -54,9 +86,10 @@ class BotPoller(
             }
             command("profile") {
                 val usageAndChat = transaction {
-                    val chat = ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()?: ChatsTable.insert {
-                        it[id] = message.chat.id
-                    }.resultedValues?.get(0)?:throw IOException("Db error")
+                    val chat =
+                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
+                            it[id] = message.chat.id
+                        }.resultedValues?.get(0) ?: throw IOException("Db error")
 
                     val contextId = chat[ChatsTable.contextId]
                     if (contextId != null)
@@ -66,11 +99,9 @@ class BotPoller(
                     else Pair(0, chat)
                 }
 
-                val text = Messages.settings(usageAndChat.first)
-
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
-                    text,
+                    Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
                     ParseMode.MARKDOWN,
                     true,
                     replyMarkup = InlineKeyboardMarkup.create(
@@ -78,11 +109,17 @@ class BotPoller(
                             InlineKeyboardButton.CallbackData(
                                 if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
                                 else "Включить автоперевод",
-                                "TODO" // TODO
+                                "switch_translator"
                             )
                         )
                     )
-                )
+                ).getOrNull()?.let { message ->
+                    transaction {
+                        ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
+                            it[lastSettings] = message.messageId
+                        }
+                    }
+                }
             }
             command("help") {
                 bot.sendMessage(
@@ -107,15 +144,81 @@ class BotPoller(
                     ) == true
                 })
             }) {
+                val usageAndChat = transaction {
+                    val chat =
+                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
+                            it[id] = message.chat.id
+                        }.resultedValues?.get(0) ?: throw IOException("Db error")
+
+                    val contextId = chat[ChatsTable.contextId]
+                    if (contextId != null)
+                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
+                            Pair(it[ContextsTable.usage], chat)
+                        } ?: Pair(0, chat)
+                    else Pair(0, chat)
+                }
+                transaction {
+                    return@transaction ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull()
+                }?.get(ChatsTable.lastSettings).apply {
+                    if (this == null) return@apply
+                    bot.editMessageText(
+                        chatId = ChatId.fromId(message.chat.id),
+                        messageId = this,
+                        text = Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
+                        replyMarkup = null,
+                        parseMode = ParseMode.MARKDOWN,
+                        disableWebPagePreview = true
+                    )
+                }
                 process(message)
+            }
+            callbackQuery("switch_translator") {
+                val message = this.callbackQuery.message ?: throw IllegalStateException()
+                val usageAndChat = transaction {
+                    val newTranslateMode =
+                        !ChatsTable.select { ChatsTable.id eq message.chat.id }.single()[ChatsTable.autoTranslate]
+                    ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
+                        it[autoTranslate] = newTranslateMode
+                    }
+
+                    val chat =
+                        ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
+                            it[id] = message.chat.id
+                        }.resultedValues?.get(0) ?: throw IOException("Db error")
+
+                    val contextId = chat[ChatsTable.contextId]
+                    if (contextId != null)
+                        ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
+                            Pair(it[ContextsTable.usage], chat)
+                        } ?: Pair(0, chat)
+                    else Pair(0, chat)
+                }
+
+                bot.editMessageText(
+                    chatId = ChatId.fromId(message.chat.id),
+                    messageId = message.messageId,
+                    text = Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
+                    parseMode = ParseMode.MARKDOWN,
+                    disableWebPagePreview = true,
+                    replyMarkup = InlineKeyboardMarkup.create(
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
+                                else "Включить автоперевод",
+                                "switch_translator"
+                            )
+                        )
+                    )
+                )
             }
         }
     }
 
     private fun process(message: Message) {
-        val requestMessage = message.text?.removePrefix(
+        var requestMessage = message.text?.removePrefix(
             Messages.namedPrefixes.find { message.text?.startsWith(it) == true } ?: ""
         ) ?: ""
+        var translateFrom = ""
 
         if (requestMessage.isEmpty()) {
             bot.sendMessage(
@@ -151,6 +254,20 @@ class BotPoller(
                         content = it[MessagesTable.text], role = it[MessagesTable.type], name = null
                     )
                 )
+            }
+        }
+
+
+        val translating = settings.translator && chat?.get(ChatsTable.autoTranslate) == true
+        if (translating) {
+            translator?.translate(
+                requestMessage,
+                "en",
+                settingsManager.yandexToken,
+                settings.yandexFolder
+            ).apply {
+                requestMessage = this?.translations?.first()?.text ?: requestMessage
+                translateFrom = this?.translations?.first()?.detectedLanguageCode ?: ""
             }
         }
 
@@ -237,7 +354,8 @@ class BotPoller(
 
         consumer(
             BotGptRequest(
-                request, message, sendMessage.get().messageId, contextId!!
+                request, message, sendMessage.get().messageId, contextId!!,
+                translating, translateFrom
             )
         )
     }
