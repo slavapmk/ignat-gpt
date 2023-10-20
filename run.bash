@@ -1,6 +1,5 @@
-if [ -f .first ]; then
+if [ -f build/libs/IgnatGPT.jar ]; then
     java -jar build/libs/IgnatGPT.jar
 else
-    touch .first
     gradle shadowJar --info
 fi
