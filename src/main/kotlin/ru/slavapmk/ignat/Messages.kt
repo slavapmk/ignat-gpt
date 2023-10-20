@@ -49,9 +49,9 @@ object Messages {
         return arrayOf(
             "*IgnatGPT Kotlin v$version Beta*",
             "",
-            "*Язык*: ${
-                if (translator) "Исходный -> Английский -> Исходный"
-                else "Исходный"
+            "*Автоперевод*: ${
+                if (translator) "сквозной"
+                else "отключен"
             }",
             "*DarkGPT*: Выключён (функция временно отключена)",
             "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
