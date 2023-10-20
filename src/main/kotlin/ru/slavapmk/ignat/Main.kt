@@ -1,37 +1,25 @@
 package ru.slavapmk.ignat
 
-import com.github.kotlintelegrambot.entities.ChatAction
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
-import io.reactivex.rxjava3.core.Completable
-import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.StdOutSqlLogger
+import org.jetbrains.exposed.sql.addLogger
+import org.jetbrains.exposed.sql.transactions.transaction
+import retrofit2.HttpException
 import ru.slavapmk.ignat.io.BotGptRequest
 import ru.slavapmk.ignat.io.db.ChatsTable
 import ru.slavapmk.ignat.io.db.ContextsTable
 import ru.slavapmk.ignat.io.db.MessagesTable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.commonmark.parser.Parser
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
-import retrofit2.HttpException
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
-
-fun isMarkdownValid(text: String): Boolean {
-    val parser = Parser.builder().build()
-    return try {
-        parser.parse(text)
-        true
-    } catch (e: Exception) {
-        false
-    }
-}
 
 suspend fun main() {
     if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
@@ -160,8 +148,16 @@ suspend fun main() {
                 chatId = ChatId.fromId(request.requestMessage.chat.id),
                 text = resultText,
                 messageId = request.statusMessageId,
-                parseMode = if (isMarkdownValid(resultText)) ParseMode.MARKDOWN else null
-            )
+                parseMode = ParseMode.MARKDOWN
+            ).first?.code()?.apply {
+                if (this == 400)
+                    poller.bot.editMessageText(
+                        chatId = ChatId.fromId(request.requestMessage.chat.id),
+                        text = resultText,
+                        messageId = request.statusMessageId,
+                        parseMode = null
+                    )
+            }
         }
     }
 }
