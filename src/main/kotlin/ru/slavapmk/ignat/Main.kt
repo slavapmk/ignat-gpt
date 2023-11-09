@@ -87,11 +87,13 @@ suspend fun main() {
                     resp
                 } catch (e: HttpException) {
                     retry = false
-                    val error = gson.fromJson(e.response()?.body().toString(), OpenaiResponse::class.java).error
+                    val toString = e.response()?.errorBody()?.string()
+                    println(toString)
+                    val error = gson.fromJson(toString, OpenaiResponse::class.java).error
                     when (e.code()) {
                         429 -> {
                             retry = true
-                            retryWait = 0
+                            retryWait = 5000
                             Messages.retry
                         }
 
