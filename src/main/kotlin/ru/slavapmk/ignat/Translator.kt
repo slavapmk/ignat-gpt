@@ -17,7 +17,9 @@ class Translator(private val debugMode: Boolean) {
             OkHttpClient
                 .Builder()
                 .addInterceptor(
-                    with(HttpLoggingInterceptor()) {
+                    with(HttpLoggingInterceptor {
+                        println("YANDEX  >>  $it")
+                    }) {
                         level = when (debugMode) {
                             true -> HttpLoggingInterceptor.Level.BODY
                             false -> HttpLoggingInterceptor.Level.NONE
