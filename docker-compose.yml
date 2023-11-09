@@ -5,4 +5,4 @@ services:
     build: .
     volumes:
       - ./storage:/app/storage
-      - ./caches:/home/gradle/.gradle/caches
+      - ./caches:/home/gradle/.gradle

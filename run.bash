@@ -1,5 +1,5 @@
-if [ -f build/libs/IgnatGPT.jar ]; then
-    java -jar build/libs/IgnatGPT.jar
+if [ -f ./build/libs/IgnatGPT.jar ]; then
+    java -jar ./build/libs/IgnatGPT.jar
 else
-    gradle shadowJar --info
+    gradle shadowJar --info && java -jar ./build/libs/IgnatGPT.jar
 fi

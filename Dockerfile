@@ -1,5 +1,6 @@
 FROM gradle:jdk17-alpine
 ENV GRADLE_OPTS="-Dorg.gradle.daemon=false"
-COPY . /home/gradle/app
-WORKDIR /home/gradle/app
-CMD ./run.bash
+COPY . /app
+WORKDIR /app
+CMD gradle run --info
+#CMD /app/run.bash
