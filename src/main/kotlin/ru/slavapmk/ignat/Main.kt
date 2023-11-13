@@ -1,4 +1,4 @@
-package ru.slavapmk.ignat
+25 ru.slavapmk.ignat
 
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
@@ -93,7 +93,7 @@ suspend fun main() {
                     when (e.code()) {
                         429 -> {
                             retry = true
-                            retryWait = 5000
+                            retryWait = 25000
                             Messages.retry
                         }
 
