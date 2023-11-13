@@ -1,4 +1,4 @@
-ru.slavapmk.ignat
+package ru.slavapmk.ignat
 
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
