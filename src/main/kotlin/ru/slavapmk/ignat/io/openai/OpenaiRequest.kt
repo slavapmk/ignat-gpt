@@ -7,5 +7,7 @@ data class OpenaiRequest(
     val model: String,
     val presence_penalty: Int,
     val temperature: Int,
-    val top_p: Int
+    val top_p: Int,
+    val translate: Boolean = false,
+    val translateFrom: String = ""
 )

@@ -33,8 +33,12 @@ object Messages {
             chatName
         )
 
-    val process = "*Ваш запрос в обработке*"
-    fun processQueue(i: Int) = "*Ваш запрос в обработке*\nНа этот момент запросов в очереди: $i"
+    fun processQueue(i: Int) =
+        if (i == 0)
+            "*Ваш запрос в обработке*"
+        else
+            "*Ваш запрос в очереди*\nНа этот момент запросов: $i"
+
     val errorDb =
         "*Получена ошибка доступа к БД*\n Пожалуйста подождите или напишите администратору"
 
@@ -58,7 +62,5 @@ object Messages {
         ).joinToString("\n")
     }
 
-    val retry = "Повторение запроса"
     val restricted: String = "Сервера OpenAI отвергли этого бота, напишите администратору"
-    val overload: String = "Сервера OpenAI перегружены, длительность ответа увеличина"
 }
