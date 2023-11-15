@@ -157,17 +157,19 @@ class BotPoller(
     }
 
     private fun getUsage(message: Message): Pair<Int, ResultRow> {
-        val chat =
-            ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
-                it[id] = message.chat.id
-            }.resultedValues?.get(0) ?: throw IOException("Db error")
+        return transaction {
+            val chat =
+                ChatsTable.select { ChatsTable.id eq message.chat.id }.singleOrNull() ?: ChatsTable.insert {
+                    it[id] = message.chat.id
+                }.resultedValues?.get(0) ?: throw IOException("Db error")
 
-        val contextId = chat[ChatsTable.contextId]
-        return if (contextId != null)
-            ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
-                Pair(it[ContextsTable.usage], chat)
-            } ?: Pair(0, chat)
-        else Pair(0, chat)
+            val contextId = chat[ChatsTable.contextId]
+            if (contextId != null)
+                ContextsTable.select { ContextsTable.id eq contextId }.singleOrNull()?.let {
+                    Pair(it[ContextsTable.usage], chat)
+                } ?: Pair(0, chat)
+            else Pair(0, chat)
+        }
     }
 
     private fun process(message: Message) {
