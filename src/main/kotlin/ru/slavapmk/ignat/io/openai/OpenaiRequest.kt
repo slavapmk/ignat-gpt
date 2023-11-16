@@ -8,6 +8,6 @@ data class OpenaiRequest(
     val presence_penalty: Int,
     val temperature: Int,
     val top_p: Int,
-    val translate: Boolean = false,
-    val translateFrom: String = ""
+    transient val translate: Boolean = false,
+    transient val translateFrom: String = ""
 )
