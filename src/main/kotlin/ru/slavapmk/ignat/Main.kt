@@ -116,9 +116,10 @@ suspend fun main() {
                 request.submitCallBack(Messages.processQueue(i), ParseMode.MARKDOWN)
             }
 
-            request.submitCallBack(resultText, ParseMode.MARKDOWN).apply {
-                if (this == 400) request.submitCallBack(resultText, null)
-            }
+            if (resultText.isNotBlank())
+                request.submitCallBack(resultText, ParseMode.MARKDOWN).apply {
+                    if (this == 400) request.submitCallBack(resultText, null)
+                }
         }
     }
 }

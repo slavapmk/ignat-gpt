@@ -14,7 +14,7 @@ import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
-class OpenaiPoller(private val debugMode: Boolean, private val proxy: String?) {
+class OpenaiPoller(private val debugMode: Boolean, private val proxyPath: String) {
     private val api: OpenaiAPI = Retrofit
         .Builder()
         .client(
@@ -32,21 +32,23 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxy: String?) {
                     }
                 )) {
 
-                if (proxy != null) {
-                    val split = proxy.split(":")
-                    proxy(
-                        Proxy(
-                            Proxy.Type.HTTP,
-                            InetSocketAddress(
-                                split[0],
-                                split[1].toInt()
-                            )
+                if (proxyPath.isNotEmpty()) {
+                    val split = proxyPath.split(":")
+                    val proxy = Proxy(
+                        if (split[2] == "socks") Proxy.Type.SOCKS else if (split[2] == "http") Proxy.Type.HTTP else Proxy.Type.DIRECT,
+                        InetSocketAddress(
+                            split[0],
+                            split[1].toInt()
                         )
                     )
-                }
+                    proxy(proxy)
+                    println("Proxy activated")
+                } else
+                    println("Proxy dis-activated")
 
                 this
             })
+//                .connectTimeout(600, TimeUnit.SECONDS)
                 .readTimeout(600, TimeUnit.SECONDS)
                 .build()
         )
