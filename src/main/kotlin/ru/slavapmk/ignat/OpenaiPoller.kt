@@ -9,6 +9,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
@@ -16,7 +18,7 @@ class OpenaiPoller(val debugMode: Boolean) {
     val api: OpenaiAPI = Retrofit
         .Builder()
         .client(
-            OkHttpClient
+            (with(OkHttpClient
                 .Builder()
                 .addInterceptor(
                     with(HttpLoggingInterceptor {
@@ -28,7 +30,24 @@ class OpenaiPoller(val debugMode: Boolean) {
                         }
                         this
                     }
-                )
+                )) {
+
+                val proxy = System.getenv("proxy")
+                if (proxy.isNotBlank()) {
+                    val split = proxy.split(":")
+                    proxy(
+                        Proxy(
+                            Proxy.Type.HTTP,
+                            InetSocketAddress(
+                                split[0],
+                                split[1].toInt()
+                            )
+                        )
+                    )
+                }
+
+                this
+            })
                 .readTimeout(600, TimeUnit.SECONDS)
                 .build()
         )
