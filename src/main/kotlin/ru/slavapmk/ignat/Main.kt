@@ -98,7 +98,8 @@ suspend fun main() {
                         else -> Messages.errorInternet(process.error.code)
                     }
                     request.submitCallBack(errorMessage, ParseMode.MARKDOWN)
-                }
+                } else
+                    resultText = process.choices.first().message.content
             } catch (e: Exception) {
                 request.submitCallBack(Messages.error(e::class.java.name), ParseMode.MARKDOWN)
             }
