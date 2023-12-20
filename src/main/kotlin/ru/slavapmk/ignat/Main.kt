@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 
 val settingsManager = SettingsManager()
-val translator = Translator(settingsManager.debugMode)
+val translator by lazy { Translator(settingsManager.debugMode) }
 
 suspend fun main() {
     if (!settingsManager.readOrInit() || settingsManager.openaiToken.isEmpty() || settingsManager.telegramToken.isEmpty()) {
