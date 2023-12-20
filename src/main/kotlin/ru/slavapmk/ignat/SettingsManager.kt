@@ -18,13 +18,22 @@ import java.io.IOException
 val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
 class SettingsManager {
-    private var proxy: String = ""
-    private var openaiToken: String = ""
-    private var telegramToken: String = ""
-    private var debugMode: Boolean = false
-    private var enableYandex: Boolean = true
-    private var yandexAuthFolder: String = ""
-    private var yandexOauthToken: String = ""
+    var proxies = emptyList<String>()
+        private set
+
+    var openaiToken: String = ""
+        private set
+
+    var telegramToken: String = ""
+        private set
+    var debugMode: Boolean = false
+        private set
+    var enableYandex: Boolean = true
+        private set
+    var yandexAuthFolder: String = ""
+        private set
+    var yandexOauthToken: String = ""
+        private set
 
     @Transient
     private lateinit var yandexIam: IamTokenResponse
@@ -42,13 +51,6 @@ class SettingsManager {
                 }
             else yandexIam.iamToken
         }
-    val yandexFolder get() = this.yandexAuthFolder
-    val translator get() = enableYandex
-
-    val openai get() = openaiToken
-    val telegram get() = telegramToken
-    val debug get() = debugMode
-    val proxyAddress get() = proxy
 
     fun readOrInit(): Boolean {
         val file = File("storage/settings.json").absoluteFile
@@ -74,7 +76,7 @@ class SettingsManager {
         debugMode = fromJson.debugMode
         yandexOauthToken = fromJson.yandexOauthToken
         yandexAuthFolder = fromJson.yandexAuthFolder
-        proxy = fromJson.proxy
+        proxies = fromJson.proxies
 
 
         api = Retrofit

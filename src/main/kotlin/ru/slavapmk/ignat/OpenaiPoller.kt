@@ -11,47 +11,37 @@ import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.ProxySelector
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
-class OpenaiPoller(private val debugMode: Boolean, private val proxyPath: String) {
+class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<String>) {
+    private val httpClient: OkHttpClient = OkHttpClient
+        .Builder()
+        .addInterceptor(
+            with(HttpLoggingInterceptor {
+                println("OPENAI  >>  $it")
+            }) {
+                level = when (debugMode) {
+                    true -> HttpLoggingInterceptor.Level.BODY
+                    false -> HttpLoggingInterceptor.Level.NONE
+                }
+                this
+            }
+        ).apply {
+            if (proxies.isEmpty())
+                println("Proxy dis-activated")
+            else {
+                proxySelector(SwitchProxySelector(proxies))
+                println("Proxy activated")
+            }
+        }
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(600, TimeUnit.SECONDS)
+        .build()
     private val api: OpenaiAPI = Retrofit
         .Builder()
-        .client(
-            (with(OkHttpClient
-                .Builder()
-                .addInterceptor(
-                    with(HttpLoggingInterceptor {
-                        println("OPENAI  >>  $it")
-                    }) {
-                        level = when (debugMode) {
-                            true -> HttpLoggingInterceptor.Level.BODY
-                            false -> HttpLoggingInterceptor.Level.NONE
-                        }
-                        this
-                    }
-                )) {
-
-                if (proxyPath.isNotEmpty()) {
-                    val split = proxyPath.split(":")
-                    val proxy = Proxy(
-                        if (split[2] == "socks") Proxy.Type.SOCKS else if (split[2] == "http") Proxy.Type.HTTP else Proxy.Type.DIRECT,
-                        InetSocketAddress(
-                            split[0],
-                            split[1].toInt()
-                        )
-                    )
-                    proxy(proxy)
-                    println("Proxy activated")
-                } else
-                    println("Proxy dis-activated")
-
-                this
-            })
-//                .connectTimeout(600, TimeUnit.SECONDS)
-                .readTimeout(600, TimeUnit.SECONDS)
-                .build()
-        )
+        .client(httpClient)
         .baseUrl("https://api.openai.com")
         .addConverterFactory(GsonConverterFactory.create())
         .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
@@ -61,7 +51,6 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxyPath: String
         var result: OpenaiResponse? = null
         var error: Throwable? = null
         var retryWait = 0L
-
         do {
             if (retryWait != 0L)
                 println("Retry in ${retryWait.toDouble() / 1000}s")

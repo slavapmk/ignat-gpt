@@ -11,15 +11,14 @@ import ru.slavapmk.ignat.io.db.ContextsTable
 import ru.slavapmk.ignat.io.db.MessagesTable
 import ru.slavapmk.ignat.io.openai.OpenaiMessage
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
-import java.lang.IllegalArgumentException
 import java.util.concurrent.ConcurrentLinkedQueue
 
 
 val settingsManager = SettingsManager()
-val translator = Translator(settingsManager.debug)
+val translator = Translator(settingsManager.debugMode)
 
 suspend fun main() {
-    if (!settingsManager.readOrInit() || settingsManager.openai.isEmpty() || settingsManager.telegram.isEmpty()) {
+    if (!settingsManager.readOrInit() || settingsManager.openaiToken.isEmpty() || settingsManager.telegramToken.isEmpty()) {
         println("Insert tokens")
         return
     }
@@ -27,7 +26,7 @@ suspend fun main() {
     if (settingsManager.yandexToken.isEmpty())
         println("Yandex translator disabled")
 
-    val openaiPoller = OpenaiPoller(settingsManager.debug, settingsManager.proxyAddress)
+    val openaiPoller = OpenaiPoller(settingsManager.debugMode, settingsManager.proxies)
 
     val queue = ConcurrentLinkedQueue<QueueRequest>()
 
@@ -81,7 +80,7 @@ suspend fun main() {
 
             try {
                 val process = openaiPoller.process(
-                    settingsManager.openai,
+                    settingsManager.openaiToken,
                     prepareRequest
                 )
 
@@ -109,7 +108,7 @@ suspend fun main() {
                     resultText,
                     translateTo,
                     settingsManager.yandexToken,
-                    settingsManager.yandexFolder
+                    settingsManager.yandexAuthFolder
                 ).translations.first().text
 
             queue.poll()
@@ -158,7 +157,7 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
 
     var requestMessage = queue.requestMessage
 
-    val translate = settingsManager.translator && chat?.get(ChatsTable.autoTranslate) == true
+    val translate = settingsManager.enableYandex && chat?.get(ChatsTable.autoTranslate) == true
     var translateFrom = ""
 
     if (translate) {
@@ -166,7 +165,7 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
             requestMessage,
             "en",
             settingsManager.yandexToken,
-            settingsManager.yandexFolder
+            settingsManager.yandexAuthFolder
         ).apply {
             requestMessage = this.translations.first().text
             translateFrom = this.translations.first().detectedLanguageCode
