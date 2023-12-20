@@ -9,9 +9,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
-import java.net.InetSocketAddress
-import java.net.Proxy
-import java.net.ProxySelector
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
@@ -47,7 +44,7 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<Str
         .addCallAdapterFactory(RxJava3CallAdapterFactory.create())
         .build().create(OpenaiAPI::class.java)
 
-    fun process(token: String, request: OpenaiRequest): OpenaiResponse {
+    fun process(settingsManager: SettingsManager, request: OpenaiRequest): OpenaiResponse {
         var result: OpenaiResponse? = null
         var error: Throwable? = null
         var retryWait = 0L
@@ -57,7 +54,7 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<Str
             Thread.sleep(retryWait)
 
             api
-                .request("Bearer $token", request)
+                .request("Bearer ${settingsManager.openaiToken}", request)
                 .blockingSubscribe(
                     { result = it },
                     { error = it }
@@ -70,8 +67,9 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<Str
                 )
                 e.error?.code = httpException.code()
                 retryWait = when (httpException.code()) {
-                    429 -> {
-                        25000
+                    401, 403, 429 -> {
+                        settingsManager.openaiSwitch()
+                        100
                     }
 
                     503 -> {

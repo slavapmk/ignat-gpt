@@ -80,7 +80,7 @@ suspend fun main() {
 
             try {
                 val process = openaiPoller.process(
-                    settingsManager.openaiToken,
+                    settingsManager,
                     prepareRequest
                 )
 

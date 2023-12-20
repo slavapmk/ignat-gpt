@@ -21,8 +21,7 @@ class SettingsManager {
     var proxies = emptyList<String>()
         private set
 
-    var openaiToken: String = ""
-        private set
+    private var openaiTokens = emptyList<String>()
 
     var telegramToken: String = ""
         private set
@@ -32,14 +31,24 @@ class SettingsManager {
         private set
     var yandexAuthFolder: String = ""
         private set
-    var yandexOauthToken: String = ""
-        private set
+    private var yandexOauthToken: String = ""
 
     @Transient
     private lateinit var yandexIam: IamTokenResponse
 
     @Transient
     private lateinit var api: YandexIamApi
+
+    @Transient
+    private var currentOpenai = 0
+
+    val openaiToken: String
+        get() = openaiTokens[currentOpenai]
+
+    fun openaiSwitch() {
+        currentOpenai = (++currentOpenai) / openaiTokens.size
+        println("Switched openai to $currentOpenai")
+    }
 
     val yandexToken
         get():String {
@@ -71,7 +80,7 @@ class SettingsManager {
             gson.fromJson(it, SettingsManager::class.java)
         }
 
-        openaiToken = fromJson.openaiToken
+        openaiTokens = fromJson.openaiTokens
         telegramToken = fromJson.telegramToken
         debugMode = fromJson.debugMode
         yandexOauthToken = fromJson.yandexOauthToken
