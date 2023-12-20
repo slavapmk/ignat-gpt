@@ -68,7 +68,7 @@ fun main() {
         request,
         settingsManager1.yandexToken,
         "en",
-        settingsManager1.yandexFolder
+        settingsManager1.yandexAuthFolder
     )
 
     println(message.translations[0].text)
@@ -79,7 +79,7 @@ fun main() {
         message.translations[0].text,
         settingsManager1.yandexToken,
         message.translations[0].detectedLanguageCode,
-        settingsManager1.yandexFolder
+        settingsManager1.yandexAuthFolder
     )
 
     println(translate.translations[0].text)

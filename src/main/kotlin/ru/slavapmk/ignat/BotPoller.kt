@@ -31,11 +31,11 @@ class BotPoller(
     private val consumer: (QueueRequest) -> Unit
 ) {
     val bot: Bot = bot {
-        logLevel = when (settings.debug) {
+        logLevel = when (settings.debugMode) {
             true -> LogLevel.All()
             false -> LogLevel.Error
         }
-        token = settings.telegram
+        token = settings.telegramToken
         dispatch {
             command("start") {
                 bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
