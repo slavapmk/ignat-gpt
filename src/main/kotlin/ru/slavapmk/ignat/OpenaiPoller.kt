@@ -1,5 +1,6 @@
 package ru.slavapmk.ignat
 
+import com.google.gson.JsonSyntaxException
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.HttpException
@@ -59,33 +60,31 @@ class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<Str
                     { result = it },
                     { error = it }
                 )
-            if (error is HttpException) {
-                val httpException = error as HttpException
-                val e = gson.fromJson(
-                    httpException.response()?.errorBody()?.string(),
-                    OpenaiResponse::class.java
-                )
-                e.error?.code = httpException.code()
-                retryWait = when (httpException.code()) {
-                    401, 403, 429 -> {
-                        settingsManager.openaiSwitch()
-                        100
-                    }
+            when (error) {
+                is HttpException -> {
+                    val httpException = error as HttpException
+                    val e = gson.fromJson(
+                        httpException.response()?.errorBody()?.string(),
+                        OpenaiResponse::class.java
+                    )
+                    e.error?.code = httpException.code()
+                    retryWait = when (httpException.code()) {
+                        401, 403, 429 -> {
+                            settingsManager.openaiSwitch()
+                            100
+                        }
 
-                    503 -> {
-                        1000
-                    }
+                        503 -> 1000
 
-                    500 -> {
-                        1000
-                    }
+                        500 -> 1000
 
-                    else -> return e
+                        else -> return e
+                    }
                 }
-            } else if (error is UnknownHostException) {
-                retryWait = 5000
-            } else {
-                break
+
+                is UnknownHostException -> retryWait = 5000
+                is JsonSyntaxException -> retryWait = 100
+                else -> break
             }
         } while (true)
 
