@@ -86,7 +86,7 @@ class SettingsManager {
         yandexOauthToken = fromJson.yandexOauthToken
         yandexAuthFolder = fromJson.yandexAuthFolder
         proxies = fromJson.proxies
-
+        enableYandex = fromJson.enableYandex
 
         api = Retrofit
             .Builder()
