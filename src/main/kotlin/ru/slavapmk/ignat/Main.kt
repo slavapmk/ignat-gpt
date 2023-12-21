@@ -23,8 +23,7 @@ suspend fun main() {
         return
     }
 
-    if (!settingsManager.enableYandex)
-        println("Yandex translator disabled")
+    if (!settingsManager.enableYandex) println("Yandex translator disabled")
 
     val openaiPoller = OpenaiPoller(settingsManager.debugMode, settingsManager.proxies)
 
@@ -51,10 +50,7 @@ suspend fun main() {
 
         queueRequest.submitCallBack = { text, parseMode ->
             poller?.bot?.editMessageText(
-                chatId = chatId,
-                text = text,
-                messageId = id,
-                parseMode = parseMode
+                chatId = chatId, text = text, messageId = id, parseMode = parseMode
             )?.first?.code()!!
         }
 
@@ -80,46 +76,38 @@ suspend fun main() {
 
             try {
                 val process = openaiPoller.process(
-                    settingsManager,
-                    prepareRequest
+                    settingsManager, prepareRequest
                 )
 
                 if (process.error != null) {
                     val errorMessage = when (process.error.code) {
                         401 -> Messages.restricted
 
-                        400 ->
-                            if (process.error.type == "context_length_exceeded")
-                                Messages.tooLongContext
-                            else
-                                Messages.errorInternet(process.error.code)
+                        400 -> when (process.error.type) {
+                            "context_length_exceeded" -> Messages.tooLongContext
+                            else -> Messages.errorInternet(process.error.code)
+                        }
 
                         else -> Messages.errorInternet(process.error.code)
                     }
                     request.submitCallBack(errorMessage, ParseMode.MARKDOWN)
-                } else
-                    resultText = process.choices.first().message.content
+                } else resultText = process.choices.first().message.content
             } catch (e: Exception) {
                 request.submitCallBack(Messages.error(e::class.java.name), ParseMode.MARKDOWN)
             }
 
-            if (translate)
-                resultText = translator.translate(
-                    resultText,
-                    translateTo,
-                    settingsManager.yandexToken,
-                    settingsManager.yandexAuthFolder
-                ).translations.first().text
+            if (translate && settingsManager.enableYandex) resultText = translator.translate(
+                resultText, translateTo, settingsManager.yandexToken, settingsManager.yandexAuthFolder
+            ).translations.first().text
 
             queue.poll()
             for ((i, _) in queue.withIndex()) {
                 request.submitCallBack(Messages.processQueue(i), ParseMode.MARKDOWN)
             }
 
-            if (resultText.isNotBlank())
-                request.submitCallBack(resultText, ParseMode.MARKDOWN).apply {
-                    if (this == 400) request.submitCallBack(resultText, null)
-                }
+            if (resultText.isNotBlank()) request.submitCallBack(resultText, ParseMode.MARKDOWN).apply {
+                if (this == 400) request.submitCallBack(resultText, null)
+            }
         }
     }
 }
@@ -157,15 +145,12 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
 
     var requestMessage = queue.requestMessage
 
-    val translate = settingsManager.enableYandex && chat?.get(ChatsTable.autoTranslate) == true
+    val translate = chat?.get(ChatsTable.autoTranslate) == true
     var translateFrom = ""
 
-    if (translate) {
+    if (translate && settingsManager.enableYandex) {
         translator.translate(
-            requestMessage,
-            "en",
-            settingsManager.yandexToken,
-            settingsManager.yandexAuthFolder
+            requestMessage, "en", settingsManager.yandexToken, settingsManager.yandexAuthFolder
         ).apply {
             requestMessage = this.translations.first().text
             translateFrom = this.translations.first().detectedLanguageCode
@@ -205,19 +190,14 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
                     when (isPm) {
                         true -> "${queue.message.chat.firstName} ${queue.message.chat.lastName ?: ""}".trim()
                         false -> queue.message.chat.title ?: ""
-                    },
-                    isPm
-                ),
-                null,
-                "system"
+                    }, isPm
+                ), null, "system"
             )
         )
     }
     requestMessages.add(
         OpenaiMessage(
-            requestMessage,
-            senderName.ifEmpty { null },
-            "user"
+            requestMessage, senderName.ifEmpty { null }, "user"
         )
     )
     transaction {

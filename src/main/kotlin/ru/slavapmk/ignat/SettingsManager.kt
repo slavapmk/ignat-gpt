@@ -52,7 +52,7 @@ class SettingsManager {
 
     val yandexToken
         get():String {
-            return if (!enableYandex) throw IllegalAccessException("Yandex disabled")
+            return if (!enableYandex) ""
             else if (!this::yandexIam.isInitialized || yandexIam.expiresEpoch < System.currentTimeMillis())
                 with(api.request(IamTokenRequest(yandexOauthToken)).blockingSingle()) {
                     yandexIam = this
