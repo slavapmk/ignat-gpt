@@ -13,7 +13,7 @@ import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
-class OpenaiPoller(private val debugMode: Boolean, private val proxies: List<String>) {
+class OpenaiProcessor(private val debugMode: Boolean, private val proxies: List<String>) {
     private val httpClient: OkHttpClient = OkHttpClient
         .Builder()
         .addInterceptor(

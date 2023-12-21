@@ -13,22 +13,19 @@ import com.github.kotlintelegrambot.entities.ParseMode
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
 import ru.slavapmk.ignat.Messages.errorQueryEmpty
 import ru.slavapmk.ignat.Messages.helpMessage
 import ru.slavapmk.ignat.io.db.ChatsTable
 import ru.slavapmk.ignat.io.db.ContextsTable
+import ru.slavapmk.ignat.io.db.QueueTable
 import java.io.IOException
 
 private const val switchTranslatorId = "switch_translator"
 
 class BotPoller(
     private val settings: SettingsManager,
-    private val consumer: (QueueRequest) -> Unit
 ) {
     val bot: Bot = bot {
         logLevel = when (settings.debugMode) {
@@ -183,11 +180,41 @@ class BotPoller(
             )
             return
         }
-        consumer(
-            QueueRequest(
-                message,
-                requestMessage
-            ) { _, _ -> 0 }
+
+        val sendMessage = bot.sendMessage(
+            chatId = ChatId.fromId(message.chat.id),
+            text = Messages.processQueue(-1),
+            parseMode = ParseMode.MARKDOWN
+        ).get().messageId
+
+        val count = transaction {
+            val insert = QueueTable.insert {
+                val userTitle = "${message.chat.firstName} ${message.chat.lastName ?: ""}".trim()
+                it[chatId] = message.chat.id
+
+                it[chatName] = when (message.chat.type == "private") {
+                    true -> userTitle
+
+                    false -> message.chat.title ?: ""
+                }
+
+                it[userName] = userTitle
+
+                it[request] = requestMessage
+
+                it[callbackMessage] = sendMessage
+            } get QueueTable.id
+
+            QueueTable.select {
+                QueueTable.id less insert and not (QueueTable.status eq "done")
+            }.count()
+        }
+
+        bot.editMessageText(
+            chatId = ChatId.fromId(message.chat.id),
+            messageId = sendMessage,
+            text = Messages.processQueue(count),
+            parseMode = ParseMode.MARKDOWN
         )
     }
 }

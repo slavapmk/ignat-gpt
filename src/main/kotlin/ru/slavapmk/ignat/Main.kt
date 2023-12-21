@@ -1,5 +1,6 @@
 package ru.slavapmk.ignat
 
+import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
 import kotlinx.coroutines.Dispatchers
@@ -9,9 +10,9 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import ru.slavapmk.ignat.io.db.ChatsTable
 import ru.slavapmk.ignat.io.db.ContextsTable
 import ru.slavapmk.ignat.io.db.MessagesTable
+import ru.slavapmk.ignat.io.db.QueueTable
 import ru.slavapmk.ignat.io.openai.OpenaiMessage
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
-import java.util.concurrent.ConcurrentLinkedQueue
 
 
 val settingsManager = SettingsManager()
@@ -25,9 +26,7 @@ suspend fun main() {
 
     if (!settingsManager.enableYandex) println("Yandex translator disabled")
 
-    val openaiPoller = OpenaiPoller(settingsManager.debugMode, settingsManager.proxies)
-
-    val queue = ConcurrentLinkedQueue<QueueRequest>()
+    val openaiPoller = OpenaiProcessor(settingsManager.debugMode, settingsManager.proxies)
 
     Database.connect(
         url = "jdbc:sqlite:storage/database.sqlite",
@@ -35,100 +34,141 @@ suspend fun main() {
     )
     transaction {
         addLogger(StdOutSqlLogger)
-        SchemaUtils.create(ChatsTable, MessagesTable, ContextsTable)
-    }
-
-    var poller: BotPoller? = null
-
-    val consumer: (QueueRequest) -> Unit = { queueRequest ->
-        val chatId = ChatId.fromId(queueRequest.message.chat.id)
-        val id = poller?.bot?.sendMessage(
-            chatId = chatId,
-            text = Messages.processQueue(queue.size),
-            parseMode = ParseMode.MARKDOWN,
-        )?.get()?.messageId
-
-        queueRequest.submitCallBack = { text, parseMode ->
-            poller?.bot?.editMessageText(
-                chatId = chatId, text = text, messageId = id, parseMode = parseMode
-            )?.first?.code()!!
+        SchemaUtils.create(ChatsTable, MessagesTable, ContextsTable, QueueTable)
+        QueueTable.update({ QueueTable.status eq "in_work" }) {
+            it[status] = "in_queue"
         }
-
-        queue.add(queueRequest)
     }
 
-    poller = BotPoller(settingsManager, consumer)
-
-    poller.bot.startPolling()
+    val bot = BotPoller(settingsManager).bot
+    bot.startPolling()
 
     withContext(Dispatchers.IO) {
-        while (true) {
-            if (queue.isEmpty()) {
-                Thread.sleep(500)
-                continue
-            }
-            val request = queue.first()
+        loop(openaiPoller, bot)
+    }
+}
 
-            val prepareRequest = prepareRequest(request)
-            var resultText = ""
-            val translate = prepareRequest.translate
-            val translateTo = prepareRequest.translateFrom
+private fun loop(
+    openaiPoller: OpenaiProcessor,
+    bot: Bot
+) {
+    while (true) {
+        val queueUnit = transaction {
+            QueueTable.select { QueueTable.status eq "in_queue" }.firstOrNull()
+        }
+        if (queueUnit == null) {
+            Thread.sleep(500)
+            continue
+        }
 
-            try {
-                val process = openaiPoller.process(
-                    settingsManager, prepareRequest
-                )
-
-                if (process.error != null) {
-                    val errorMessage = when (process.error.code) {
-                        401 -> Messages.restricted
-
-                        400 -> when (process.error.type) {
-                            "context_length_exceeded" -> Messages.tooLongContext
-                            else -> Messages.errorInternet(process.error.code)
-                        }
-
-                        else -> Messages.errorInternet(process.error.code)
-                    }
-                    request.submitCallBack(errorMessage, ParseMode.MARKDOWN)
-                } else resultText = process.choices.first().message.content
-            } catch (e: Exception) {
-                request.submitCallBack(Messages.error(e::class.java.name), ParseMode.MARKDOWN)
-            }
-
-            if (translate && settingsManager.enableYandex) resultText = translator.translate(
-                resultText, translateTo, settingsManager.yandexToken, settingsManager.yandexAuthFolder
-            ).translations.first().text
-
-            queue.poll()
-            for ((i, _) in queue.withIndex()) {
-                request.submitCallBack(Messages.processQueue(i), ParseMode.MARKDOWN)
-            }
-
-            if (resultText.isNotBlank()) request.submitCallBack(resultText, ParseMode.MARKDOWN).apply {
-                if (this == 400) request.submitCallBack(resultText, null)
+        val update = transaction {
+            QueueTable.update({
+                (QueueTable.id eq queueUnit[QueueTable.id]) and (QueueTable.status eq "in_queue")
+            }) {
+                it[status] = "in_work"
             }
         }
+        if (update != 1)
+            continue
+
+        val prepareRequest = prepareRequest(queueUnit, bot)
+        var resultText = ""
+        val translate = prepareRequest.translate
+        val translateTo = prepareRequest.translateFrom
+
+        try {
+            val process = openaiPoller.process(
+                settingsManager, prepareRequest
+            )
+
+            if (process.error != null) {
+                val errorMessage = when (process.error.code) {
+                    401 -> Messages.restricted
+
+                    400 -> when (process.error.type) {
+                        "context_length_exceeded" -> Messages.tooLongContext
+                        else -> Messages.errorInternet(process.error.code)
+                    }
+
+                    else -> Messages.errorInternet(process.error.code)
+                }
+
+                bot.editMessageText(
+                    chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+                    messageId = queueUnit[QueueTable.callbackMessage],
+                    text = errorMessage,
+                    parseMode = ParseMode.MARKDOWN
+                )
+            } else resultText = process.choices.first().message.content
+        } catch (e: Exception) {
+            bot.editMessageText(
+                chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+                messageId = queueUnit[QueueTable.callbackMessage],
+                text = Messages.error(e::class.java.name),
+                parseMode = ParseMode.MARKDOWN
+            )
+        }
+
+        if (translate && settingsManager.enableYandex) resultText = translator.translate(
+            resultText, translateTo, settingsManager.yandexToken, settingsManager.yandexAuthFolder
+        ).translations.first().text
+
+
+        transaction {
+            QueueTable.update({
+                QueueTable.id eq queueUnit[QueueTable.id]
+            }) {
+                it[status] = "done"
+            }
+
+            for ((index, resultRow) in QueueTable.select {
+                QueueTable.status eq "in_queue"
+            }.withIndex()) {
+                bot.editMessageText(
+                    chatId = ChatId.fromId(resultRow[QueueTable.chatId]),
+                    messageId = resultRow[QueueTable.callbackMessage],
+                    text = Messages.processQueue(index.toLong()),
+                    parseMode = ParseMode.MARKDOWN
+                )
+            }
+        }
+
+
+        if (resultText.isNotBlank())
+            bot.editMessageText(
+                chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+                messageId = queueUnit[QueueTable.callbackMessage],
+                text = resultText,
+                parseMode = ParseMode.MARKDOWN
+            ).apply {
+                if ((first?.code() ?: 0) == 400)
+                    bot.editMessageText(
+                        chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+                        messageId = queueUnit[QueueTable.callbackMessage],
+                        text = resultText,
+                        parseMode = ParseMode.MARKDOWN
+                    )
+            }
     }
 }
 
 
-fun prepareRequest(queue: QueueRequest): OpenaiRequest {
+fun prepareRequest(queueUnit: ResultRow, bot: Bot): OpenaiRequest {
     var chat: ResultRow? = null
     var contextId: Int? = null
     var contextUsage: Int? = null
     val requestMessages = mutableListOf<OpenaiMessage>()
 
     transaction {
-        chat = ChatsTable.select { ChatsTable.id eq queue.message.chat.id }.singleOrNull() ?: ChatsTable.insert {
-            it[id] = queue.message.chat.id
+        chat = ChatsTable.select { ChatsTable.id eq queueUnit[QueueTable.chatId] }.singleOrNull() ?: ChatsTable.insert {
+            it[id] = queueUnit[QueueTable.chatId]
         }.resultedValues?.first()
 
         contextId = chat?.get(ChatsTable.contextId) ?: ContextsTable.insert {
-            it[chatId] = queue.message.chat.id
+            it[chatId] = queueUnit[QueueTable.chatId]
         }[ContextsTable.id]
 
-        ChatsTable.update({ ChatsTable.id eq queue.message.chat.id }) {
+        ChatsTable.update({ ChatsTable.id eq queueUnit[QueueTable.chatId] }) {
             it[ChatsTable.contextId] = contextId
         }
 
@@ -143,7 +183,7 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
         }
     }
 
-    var requestMessage = queue.requestMessage
+    var requestMessage = queueUnit[QueueTable.request]
 
     val translate = chat?.get(ChatsTable.autoTranslate) == true
     var translateFrom = ""
@@ -158,7 +198,12 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
     }
 
     if (contextUsage == null || contextId == null || chat == null) {
-        queue.submitCallBack(Messages.errorDb, ParseMode.MARKDOWN)
+        bot.editMessageText(
+            chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+            messageId = queueUnit[QueueTable.callbackMessage],
+            text = Messages.errorDb,
+            parseMode = ParseMode.MARKDOWN
+        )
     }
 
     val settingsMaxTokens = chat?.get(ChatsTable.maxTokens) ?: 1500
@@ -168,30 +213,28 @@ fun prepareRequest(queue: QueueRequest): OpenaiRequest {
     val maxTokens = if (remains > settingsMaxTokens) settingsMaxTokens
     else if (remains > 300) remains
     else {
-        queue.submitCallBack(Messages.tooLongContext, ParseMode.MARKDOWN)
+        bot.editMessageText(
+            chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+            messageId = queueUnit[QueueTable.callbackMessage],
+            text = Messages.tooLongContext,
+            parseMode = ParseMode.MARKDOWN
+        )
         throw IllegalArgumentException()
     }
 
-
-    var name = queue.message.from?.firstName ?: ""
-    queue.message.from?.lastName?.let {
-        name += "_${it}"
-    }
-
-    val senderName = with(translit(name).replace(Regex("[^a-zA-Z0-9_-]"), "")) {
+    val senderName = with(translit(queueUnit[QueueTable.userName]).replace(Regex("[^a-zA-Z0-9_-]"), "")) {
         if (length > 50) substring(0, 50) else this
     }
 
     if (requestMessages.isEmpty()) {
-        val isPm = queue.message.chat.type == "private"
         requestMessages.add(
             OpenaiMessage(
                 Messages.assistantPrompt(
-                    when (isPm) {
-                        true -> "${queue.message.chat.firstName} ${queue.message.chat.lastName ?: ""}".trim()
-                        false -> queue.message.chat.title ?: ""
-                    }, isPm
-                ), null, "system"
+                    queueUnit[QueueTable.chatName],
+                    queueUnit[QueueTable.chatId].toString().startsWith("-100").not()
+                ),
+                senderName.ifEmpty { null },
+                "system"
             )
         )
     }
