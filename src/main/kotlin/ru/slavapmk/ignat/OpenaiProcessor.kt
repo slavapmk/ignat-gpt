@@ -2,7 +2,6 @@ package ru.slavapmk.ignat
 
 import com.google.gson.JsonSyntaxException
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava3.RxJava3CallAdapterFactory
@@ -11,32 +10,8 @@ import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
 import java.net.UnknownHostException
-import java.util.concurrent.TimeUnit
 
-class OpenaiProcessor(private val debugMode: Boolean, private val proxies: List<String>) {
-    private val httpClient: OkHttpClient = OkHttpClient
-        .Builder()
-        .addInterceptor(
-            with(HttpLoggingInterceptor {
-                println("OPENAI  >>  $it")
-            }) {
-                level = when (debugMode) {
-                    true -> HttpLoggingInterceptor.Level.BODY
-                    false -> HttpLoggingInterceptor.Level.NONE
-                }
-                this
-            }
-        ).apply {
-            if (proxies.isEmpty())
-                println("Proxy dis-activated")
-            else {
-                proxySelector(SwitchProxySelector(proxies))
-                println("Proxy activated")
-            }
-        }
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(600, TimeUnit.SECONDS)
-        .build()
+class OpenaiProcessor(httpClient: OkHttpClient) {
     private val api: OpenaiAPI = Retrofit
         .Builder()
         .client(httpClient)
