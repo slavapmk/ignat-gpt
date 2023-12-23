@@ -9,6 +9,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import ru.slavapmk.ignat.io.OpenaiAPI
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
 import ru.slavapmk.ignat.io.openai.OpenaiResponse
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 class OpenaiProcessor(httpClient: OkHttpClient) {
@@ -59,6 +60,7 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
 
                 is UnknownHostException -> retryWait = 5000
                 is JsonSyntaxException -> retryWait = 100
+                is SocketTimeoutException -> retryWait = 100
                 else -> break
             }
         } while (true)
