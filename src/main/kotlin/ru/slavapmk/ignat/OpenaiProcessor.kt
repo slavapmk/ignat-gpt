@@ -42,7 +42,7 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
                     retryWait = when (httpException.code()) {
                         401, 403, 429 -> {
                             settingsManager.openaiSwitch()
-                            100
+                            2500
                         }
 
                         503 -> 1000
