@@ -23,9 +23,10 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
 
     fun process(settingsManager: SettingsManager, request: OpenaiRequest): OpenaiResponse {
         var result: OpenaiResponse? = null
-        var error: Throwable? = null
+        var error: Throwable?
         var retryWait = 0L
         do {
+            error = null
             if (retryWait != 0L)
                 println("Retry in ${retryWait.toDouble() / 1000}s")
             Thread.sleep(retryWait)
