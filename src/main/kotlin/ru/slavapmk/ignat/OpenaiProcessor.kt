@@ -69,7 +69,17 @@ class OpenaiProcessor(private val debugMode: Boolean, private val proxies: List<
                     )
                     e.error?.code = httpException.code()
                     retryWait = when (httpException.code()) {
-                        401, 403, 429 -> {
+                        401 -> {
+                            settingsManager.openaiSwitch()
+                            100
+                        }
+
+                        403 -> {
+                            settingsManager.openaiSwitch()
+                            100
+                        }
+
+                        429 -> {
                             settingsManager.openaiSwitch()
                             100
                         }
