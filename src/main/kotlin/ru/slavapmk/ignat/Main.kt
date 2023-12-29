@@ -3,8 +3,10 @@ package ru.slavapmk.ignat
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.ParseMode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.logging.HttpLoggingInterceptor
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import ru.slavapmk.ignat.io.db.ChatsTable
@@ -13,6 +15,8 @@ import ru.slavapmk.ignat.io.db.MessagesTable
 import ru.slavapmk.ignat.io.db.QueueTable
 import ru.slavapmk.ignat.io.openai.OpenaiMessage
 import ru.slavapmk.ignat.io.openai.OpenaiRequest
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
@@ -26,7 +30,36 @@ suspend fun main() {
 
     if (!settingsManager.enableYandex) println("Yandex translator disabled")
 
-    val openaiPoller = OpenaiProcessor(settingsManager.debugMode, settingsManager.proxies)
+    val httpClient: OkHttpClient = OkHttpClient
+        .Builder()
+        .addInterceptor(
+            with(HttpLoggingInterceptor {
+                println("OPENAI  >>  $it")
+            }) {
+                level = when (settingsManager.debugMode) {
+                    true -> HttpLoggingInterceptor.Level.BODY
+                    false -> HttpLoggingInterceptor.Level.NONE
+                }
+                this
+            }
+        ).apply {
+            if (
+                settingsManager.proxies.isEmpty())
+                println("Proxy dis-activated")
+            else {
+                proxySelector(
+                    SwitchProxySelector(
+                        settingsManager.proxies
+                    )
+                )
+                println("Proxy activated")
+            }
+        }
+        .connectTimeout(2, TimeUnit.SECONDS)
+        .readTimeout(600, TimeUnit.SECONDS)
+        .build()
+
+    val openaiPoller = OpenaiProcessor(httpClient)
 
     Database.connect(
         url = "jdbc:sqlite:storage/database.sqlite",
@@ -43,8 +76,27 @@ suspend fun main() {
     val bot = BotPoller(settingsManager).bot
     bot.startPolling()
 
-    withContext(Dispatchers.IO) {
-        loop(openaiPoller, bot)
+    runBlocking {
+        coroutineScope {
+            launch {
+                loop(openaiPoller, bot)
+            }
+            launch {
+                while (true) {
+                    val request = Request.Builder()
+                        .url("https://api.openai.com/")
+                        .get()
+                        .build()
+                    try {
+                        httpClient.newCall(request).execute()
+                    } catch (e: IOException) {
+                        println("Can not access")
+                    }
+                    delay(120000L)
+                }
+            }
+            println("Launched")
+        }
     }
 }
 
