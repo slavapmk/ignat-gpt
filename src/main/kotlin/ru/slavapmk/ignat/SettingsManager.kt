@@ -46,8 +46,9 @@ class SettingsManager {
         get() = openaiTokens[currentOpenai]
 
     fun openaiSwitch() {
-        currentOpenai = (++currentOpenai) / openaiTokens.size
-        println("Switched openai to $currentOpenai")
+        currentOpenai = (++currentOpenai) % openaiTokens.size
+        println("Switched openai to ${currentOpenai + 1}")
+        println()
     }
 
     val yandexToken

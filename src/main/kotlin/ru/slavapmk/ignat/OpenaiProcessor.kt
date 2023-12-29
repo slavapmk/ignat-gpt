@@ -40,17 +40,7 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
                 is HttpException -> {
                     val httpException = error as HttpException
                     retryWait = when (httpException.code()) {
-                        401 -> {
-                            settingsManager.openaiSwitch()
-                            100
-                        }
-
-                        403 -> {
-                            settingsManager.openaiSwitch()
-                            100
-                        }
-
-                        429 -> {
+                        401, 403, 429 -> {
                             settingsManager.openaiSwitch()
                             100
                         }
