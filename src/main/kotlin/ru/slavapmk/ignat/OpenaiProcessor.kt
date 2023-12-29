@@ -39,11 +39,6 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
             when (error) {
                 is HttpException -> {
                     val httpException = error as HttpException
-                    val e = gson.fromJson(
-                        httpException.response()?.errorBody()?.string(),
-                        OpenaiResponse::class.java
-                    )
-                    e.error?.code = httpException.code()
                     retryWait = when (httpException.code()) {
                         401 -> {
                             settingsManager.openaiSwitch()
@@ -64,7 +59,14 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
 
                         500 -> 1000
 
-                        else -> return e
+                        else -> {
+                            val e = gson.fromJson(
+                                httpException.response()?.errorBody()?.string()?.replace("null", "\"null\""),
+                                OpenaiResponse::class.java
+                            )
+                            e.error?.code = httpException.code()
+                            return e
+                        }
                     }
                 }
 
