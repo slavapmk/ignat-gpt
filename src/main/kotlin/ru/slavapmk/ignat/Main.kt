@@ -2,8 +2,15 @@ package ru.slavapmk.ignat
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
+import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
+import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.ParseMode
-import kotlinx.coroutines.*
+import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
+import com.github.kotlintelegrambot.network.Response
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
@@ -104,6 +111,7 @@ private fun loop(
     openaiPoller: OpenaiProcessor,
     bot: Bot
 ) {
+    val botUsername = bot.getMe().get().username!!
     while (true) {
         val queueUnit = transaction {
             QueueTable.select { QueueTable.status eq "in_queue" }.firstOrNull()
@@ -123,7 +131,59 @@ private fun loop(
         if (update != 1)
             continue
 
-        val prepareRequest = prepareRequest(queueUnit, bot)
+
+        val prepareRequest = if (queueUnit[QueueTable.callbackMessage] != null)
+            prepareRequest(queueUnit, bot)
+        else
+            OpenaiRequest(
+                model = "gpt-3.5-turbo",
+                temperature = 1,
+                max_tokens = 1024,
+                top_p = 1,
+                frequency_penalty = 0,
+                presence_penalty = 0,
+                messages = listOf(
+                    OpenaiMessage(
+                        content = Messages.assistantPrompt(
+                            queueUnit[QueueTable.chatName],
+                            false
+                        ),
+                        role = "system"
+                    ),
+                    OpenaiMessage(
+                        content = queueUnit[QueueTable.request],
+                        name = with(translit(queueUnit[QueueTable.userName]).replace(Regex("[^a-zA-Z0-9_-]"), "")) {
+                            if (length > 50) substring(0, 50) else this
+                        },
+                        role = "system"
+                    ),
+                ),
+                translate = false,
+                translateFrom = ""
+            )
+        val callback: (String, ParseMode?) -> Pair<retrofit2.Response<Response<Message>?>?, Exception?> =
+            if (queueUnit[QueueTable.callbackMessage] != null) {
+                { text, format ->
+                    bot.editMessageText(
+                        chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
+                        messageId = queueUnit[QueueTable.callbackMessage],
+                        text = text,
+                        parseMode = format
+                    )
+                }
+            } else {
+                { text, format ->
+                    bot.editMessageText(
+                        text = text,
+                        parseMode = format,
+                        inlineMessageId = queueUnit[QueueTable.callbackInline],
+                        replyMarkup = InlineKeyboardMarkup.createSingleButton(
+                            InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
+                        )
+                    )
+                }
+            }
+
         var resultText = ""
         val translate = prepareRequest.translate
         val translateTo = prepareRequest.translateFrom
@@ -144,21 +204,10 @@ private fun loop(
 
                     else -> Messages.errorInternet(process.error.code)
                 }
-
-                bot.editMessageText(
-                    chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
-                    messageId = queueUnit[QueueTable.callbackMessage],
-                    text = errorMessage,
-                    parseMode = ParseMode.MARKDOWN
-                )
+                callback(errorMessage, ParseMode.MARKDOWN)
             } else resultText = process.choices.first().message.content
         } catch (e: Exception) {
-            bot.editMessageText(
-                chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
-                messageId = queueUnit[QueueTable.callbackMessage],
-                text = Messages.error(e::class.java.name),
-                parseMode = ParseMode.MARKDOWN
-            )
+            callback(Messages.error(e::class.java.name), ParseMode.MARKDOWN)
         }
 
         if (translate && settingsManager.enableYandex) resultText = translator.translate(
@@ -176,31 +225,29 @@ private fun loop(
             for ((index, resultRow) in QueueTable.select {
                 QueueTable.status eq "in_queue"
             }.withIndex()) {
-                bot.editMessageText(
-                    chatId = ChatId.fromId(resultRow[QueueTable.chatId]),
-                    messageId = resultRow[QueueTable.callbackMessage],
-                    text = Messages.processQueue(index.toLong()),
-                    parseMode = ParseMode.MARKDOWN
-                )
+                if (resultRow[QueueTable.callbackMessage] != null)
+                    bot.editMessageText(
+                        chatId = ChatId.fromId(resultRow[QueueTable.chatId]),
+                        messageId = resultRow[QueueTable.callbackMessage],
+                        text = Messages.processQueue(index.toLong()),
+                        parseMode = ParseMode.MARKDOWN
+                    )
+                else
+                    bot.editMessageText(
+                        inlineMessageId = resultRow[QueueTable.callbackInline],
+                        text = Messages.processQueue(index.toLong()),
+                        parseMode = ParseMode.MARKDOWN
+                    )
             }
         }
 
 
         if (resultText.isNotBlank())
-            bot.editMessageText(
-                chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
-                messageId = queueUnit[QueueTable.callbackMessage],
-                text = resultText,
-                parseMode = ParseMode.MARKDOWN
-            ).apply {
-                if ((first?.code() ?: 0) == 400)
-                    bot.editMessageText(
-                        chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
-                        messageId = queueUnit[QueueTable.callbackMessage],
-                        text = resultText,
-                        parseMode = ParseMode.MARKDOWN
-                    )
-            }
+            callback(resultText, ParseMode.MARKDOWN)
+                .apply {
+                    if ((first?.code() ?: 0) == 400)
+                        callback(resultText, null)
+                }
     }
 }
 

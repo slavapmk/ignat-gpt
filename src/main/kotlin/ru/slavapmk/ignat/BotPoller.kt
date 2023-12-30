@@ -7,16 +7,12 @@ import com.github.kotlintelegrambot.dispatcher.callbackQuery
 import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.inlineQuery
 import com.github.kotlintelegrambot.dispatcher.message
-import com.github.kotlintelegrambot.entities.ChatId
-import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
-import com.github.kotlintelegrambot.entities.Message
-import com.github.kotlintelegrambot.entities.ParseMode
+import com.github.kotlintelegrambot.entities.*
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
 import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
-import kotlinx.coroutines.delay
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import ru.slavapmk.ignat.Messages.errorQueryEmpty
@@ -41,9 +37,6 @@ class BotPoller(
         }
         token = settings.telegramToken
         dispatch {
-            command("start") {
-                bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "This is test ignat2 bot!")
-            }
             command("newcontext") {
                 hideSettings(message)
 
@@ -141,14 +134,7 @@ class BotPoller(
                 )
             }
             addHandler(InlineResultHandler {
-                delay(1000)
-                bot.editMessageText(
-                    text = "Типа тут что-то умное должно быть",
-                    inlineMessageId = inlineResult.inlineMessageId,
-                    replyMarkup = InlineKeyboardMarkup.createSingleButton(
-                        InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
-                    )
-                )
+                processInline(inlineResult)
             })
             inlineQuery {
                 if (inlineQuery.query.isEmpty()) {
@@ -157,7 +143,7 @@ class BotPoller(
                         emptyList()
                     )
                 } else {
-                    val inputMessageContent = InputMessageContent.Text("Обработка запроса...")
+                    val inputMessageContent = InputMessageContent.Text(Messages.processQueue(-1))
                     bot.answerInlineQuery(
                         this.inlineQuery.id,
                         InlineQueryResult.Article(
@@ -165,11 +151,11 @@ class BotPoller(
                             title = "ChatGPT",
                             description = this.inlineQuery.query,
                             inputMessageContent = inputMessageContent,
-                            thumbUrl = "https://i.imgur.com/fuoEOCa.png",
+                            thumbUrl = "https://i.imgur.com/UlxDlmG.png",
                             thumbWidth = 512,
                             thumbHeight = 512,
                             replyMarkup = InlineKeyboardMarkup.createSingleButton(
-                                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/ignat_gpt_bot")
+                                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
                             )
                         )
                     )
@@ -257,6 +243,36 @@ class BotPoller(
             messageId = sendMessage,
             text = Messages.processQueue(count),
             parseMode = ParseMode.MARKDOWN
+        )
+    }
+
+    private fun processInline(message: ChosenInlineResult) {
+        val count = transaction {
+            val insert = QueueTable.insert {
+                val userTitle = "${message.from.firstName} ${message.from.lastName ?: ""}".trim()
+                it[chatId] = message.from.id
+
+                it[chatName] = userTitle
+
+                it[userName] = userTitle
+
+                it[request] = message.query
+
+                it[callbackInline] = message.inlineMessageId
+            } get QueueTable.id
+
+            QueueTable.select {
+                QueueTable.id less insert and not(QueueTable.status eq "done")
+            }.count()
+        }
+
+        bot.editMessageText(
+            inlineMessageId = message.inlineMessageId,
+            text = Messages.processQueue(count),
+            parseMode = ParseMode.MARKDOWN,
+            replyMarkup = InlineKeyboardMarkup.createSingleButton(
+                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
+            )
         )
     }
 }
