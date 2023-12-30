@@ -5,14 +5,18 @@ import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
 import com.github.kotlintelegrambot.dispatcher.callbackQuery
 import com.github.kotlintelegrambot.dispatcher.command
+import com.github.kotlintelegrambot.dispatcher.inlineQuery
 import com.github.kotlintelegrambot.dispatcher.message
 import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.ParseMode
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InlineQueryResult
+import com.github.kotlintelegrambot.entities.inlinequeryresults.InputMessageContent
 import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.extensions.filters.Filter
 import com.github.kotlintelegrambot.logging.LogLevel
+import kotlinx.coroutines.delay
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import ru.slavapmk.ignat.Messages.errorQueryEmpty
@@ -27,6 +31,9 @@ private const val switchTranslatorId = "switch_translator"
 class BotPoller(
     private val settings: SettingsManager,
 ) {
+    private val botUsername: String by lazy {
+        bot.getMe().get().username!!
+    }
     val bot: Bot = bot {
         logLevel = when (settings.debugMode) {
             true -> LogLevel.All()
@@ -133,6 +140,41 @@ class BotPoller(
                     )
                 )
             }
+            addHandler(InlineResultHandler {
+                delay(1000)
+                bot.editMessageText(
+                    text = "Типа тут что-то умное должно быть",
+                    inlineMessageId = inlineResult.inlineMessageId,
+                    replyMarkup = InlineKeyboardMarkup.createSingleButton(
+                        InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
+                    )
+                )
+            })
+            inlineQuery {
+                if (inlineQuery.query.isEmpty()) {
+                    bot.answerInlineQuery(
+                        this.inlineQuery.id,
+                        emptyList()
+                    )
+                } else {
+                    val inputMessageContent = InputMessageContent.Text("Обработка запроса...")
+                    bot.answerInlineQuery(
+                        this.inlineQuery.id,
+                        InlineQueryResult.Article(
+                            id = "chatgpt",
+                            title = "ChatGPT",
+                            description = this.inlineQuery.query,
+                            inputMessageContent = inputMessageContent,
+                            thumbUrl = "https://i.imgur.com/fuoEOCa.png",
+                            thumbWidth = 512,
+                            thumbHeight = 512,
+                            replyMarkup = InlineKeyboardMarkup.createSingleButton(
+                                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/ignat_gpt_bot")
+                            )
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -206,7 +248,7 @@ class BotPoller(
             } get QueueTable.id
 
             QueueTable.select {
-                QueueTable.id less insert and not (QueueTable.status eq "done")
+                QueueTable.id less insert and not(QueueTable.status eq "done")
             }.count()
         }
 
