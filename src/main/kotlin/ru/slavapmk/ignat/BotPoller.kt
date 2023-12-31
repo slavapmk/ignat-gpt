@@ -27,9 +27,6 @@ private const val switchTranslatorId = "switch_translator"
 class BotPoller(
     private val settings: SettingsManager,
 ) {
-    private val botUsername: String by lazy {
-        bot.getMe().get().username!!
-    }
     val bot: Bot = bot {
         logLevel = when (settings.debugMode) {
             true -> LogLevel.All()
@@ -143,19 +140,22 @@ class BotPoller(
                         emptyList()
                     )
                 } else {
-                    val inputMessageContent = InputMessageContent.Text(Messages.processQueue(-1))
+                    val inputMessageContent = InputMessageContent.Text(
+                        Messages.processQueue(-1),
+                        parseMode = ParseMode.MARKDOWN
+                    )
                     bot.answerInlineQuery(
                         this.inlineQuery.id,
                         InlineQueryResult.Article(
                             id = "chatgpt",
                             title = "ChatGPT",
-                            description = this.inlineQuery.query,
+                            description = inlineQuery.query,
                             inputMessageContent = inputMessageContent,
                             thumbUrl = "https://i.imgur.com/UlxDlmG.png",
                             thumbWidth = 512,
                             thumbHeight = 512,
                             replyMarkup = InlineKeyboardMarkup.createSingleButton(
-                                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
+                                InlineKeyboardButton.Url("Поддержка", "https://t.me/viniclemk")
                             )
                         )
                     )
@@ -269,10 +269,7 @@ class BotPoller(
         bot.editMessageText(
             inlineMessageId = message.inlineMessageId,
             text = Messages.processQueue(count),
-            parseMode = ParseMode.MARKDOWN,
-            replyMarkup = InlineKeyboardMarkup.createSingleButton(
-                InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
-            )
+            parseMode = ParseMode.MARKDOWN
         )
     }
 }

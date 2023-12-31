@@ -2,15 +2,12 @@ package ru.slavapmk.ignat
 
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.entities.ChatId
-import com.github.kotlintelegrambot.entities.InlineKeyboardMarkup
 import com.github.kotlintelegrambot.entities.Message
 import com.github.kotlintelegrambot.entities.ParseMode
-import com.github.kotlintelegrambot.entities.keyboard.InlineKeyboardButton
 import com.github.kotlintelegrambot.network.Response
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
@@ -83,27 +80,25 @@ suspend fun main() {
     val bot = BotPoller(settingsManager).bot
     bot.startPolling()
 
-    runBlocking {
-        coroutineScope {
-            launch {
-                loop(openaiPoller, bot)
-            }
-            launch {
-                while (true) {
-                    val request = Request.Builder()
-                        .url("https://api.openai.com/")
-                        .get()
-                        .build()
-                    try {
-                        httpClient.newCall(request).execute()
-                    } catch (e: IOException) {
-                        println("Can not access")
-                    }
-                    delay(120000L)
-                }
-            }
-            println("Launched")
+    coroutineScope {
+        launch {
+            loop(openaiPoller, bot)
         }
+        launch {
+            while (true) {
+                val request = Request.Builder()
+                    .url("https://api.openai.com/")
+                    .get()
+                    .build()
+                try {
+                    httpClient.newCall(request).execute()
+                } catch (e: IOException) {
+                    continue
+                }
+                delay(120000L)
+            }
+        }
+        println("Launched")
     }
 }
 
@@ -111,7 +106,6 @@ private fun loop(
     openaiPoller: OpenaiProcessor,
     bot: Bot
 ) {
-    val botUsername = bot.getMe().get().username!!
     while (true) {
         val queueUnit = transaction {
             QueueTable.select { QueueTable.status eq "in_queue" }.firstOrNull()
@@ -176,10 +170,7 @@ private fun loop(
                     bot.editMessageText(
                         text = text,
                         parseMode = format,
-                        inlineMessageId = queueUnit[QueueTable.callbackInline],
-                        replyMarkup = InlineKeyboardMarkup.createSingleButton(
-                            InlineKeyboardButton.Url("Перейти к боту", "https://t.me/${botUsername}")
-                        )
+                        inlineMessageId = queueUnit[QueueTable.callbackInline]
                     )
                 }
             }
