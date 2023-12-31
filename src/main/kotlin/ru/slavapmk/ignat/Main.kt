@@ -232,6 +232,8 @@ private fun loop(
             }
         }
 
+        if (queueUnit[QueueTable.callbackInline] != null)
+            resultText = "> ${queueUnit[QueueTable.request]}\n\n> $resultText"
 
         if (resultText.isNotBlank())
             callback(resultText, ParseMode.MARKDOWN)
