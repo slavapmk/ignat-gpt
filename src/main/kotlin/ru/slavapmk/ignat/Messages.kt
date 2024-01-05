@@ -51,15 +51,18 @@ object Messages {
                 "Попробуйте начать новый контекст и повторить позже, либо напишите [администратору](https://t.me/viniclemk)"
 
     val version = "2.0.2"
-    fun settings(usage: Int, translator: Boolean): String {
+    fun settings(usage: Int, translator: Boolean, jailbreak: Boolean): String {
         return arrayOf(
             "*IgnatGPT Kotlin v$version Beta*",
             "",
             "*Автоперевод*: ${
                 if (translator) "сквозной"
-                else "отключен"
+                else "Отключен"
             }",
-            "*DarkGPT*: Выключён (функция временно отключена)",
+            "*JailBreak*: ${
+                if (jailbreak) "Включен"
+                else "Отключен"
+            }",
             "*Размер диалога*: $usage из 3500 токенов (осталось ${3500 - usage})"
         ).joinToString("\n")
     }

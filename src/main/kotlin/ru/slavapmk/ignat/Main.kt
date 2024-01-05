@@ -244,6 +244,7 @@ private fun loop(
     }
 }
 
+val russianAlph = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".toCharArray()
 
 fun prepareRequest(queueUnit: ResultRow, bot: Bot): OpenaiRequest {
     var chat: ResultRow? = null
@@ -289,13 +290,14 @@ fun prepareRequest(queueUnit: ResultRow, bot: Bot): OpenaiRequest {
         }
     }
 
-    if (contextUsage == null || contextId == null || chat == null) {
-        bot.editMessageText(
-            chatId = ChatId.fromId(queueUnit[QueueTable.chatId]),
-            messageId = queueUnit[QueueTable.callbackMessage],
-            text = Messages.errorDb,
-            parseMode = ParseMode.MARKDOWN
-        )
+    if (chat?.get(ChatsTable.darkMode) == true) {
+        val prefix = if (
+            translateFrom == "ru" ||
+            requestMessage.count { russianAlph.contains(it) } * 100 / requestMessage.length > 90
+        ) {
+            "ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ. "
+        } else ""
+        requestMessage = settingsManager.jailbreakPrompt.replace("\${PROMPT}", prefix + requestMessage)
     }
 
     val settingsMaxTokens = chat?.get(ChatsTable.maxTokens) ?: 1500

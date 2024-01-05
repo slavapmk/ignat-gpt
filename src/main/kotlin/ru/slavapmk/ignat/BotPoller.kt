@@ -23,6 +23,7 @@ import ru.slavapmk.ignat.io.db.QueueTable
 import java.io.IOException
 
 private const val switchTranslatorId = "switch_translator"
+private const val switchJailbreakId = "switch_jailbreak"
 
 class BotPoller(
     private val settings: SettingsManager,
@@ -56,8 +57,11 @@ class BotPoller(
 
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
-                    Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
-                    ParseMode.MARKDOWN,
+                    text = Messages.settings(
+                        usageAndChat.first,
+                        usageAndChat.second[ChatsTable.autoTranslate],
+                        usageAndChat.second[ChatsTable.darkMode]
+                    ), ParseMode.MARKDOWN,
                     true,
                     replyMarkup = InlineKeyboardMarkup.create(
                         listOf(
@@ -65,6 +69,11 @@ class BotPoller(
                                 if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
                                 else "Включить автоперевод",
                                 switchTranslatorId
+                            ),
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
+                                else "Включить Jailbreak",
+                                switchJailbreakId
                             )
                         )
                     )
@@ -116,7 +125,47 @@ class BotPoller(
                 bot.editMessageText(
                     chatId = ChatId.fromId(message.chat.id),
                     messageId = message.messageId,
-                    text = Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
+                    text = Messages.settings(
+                        usageAndChat.first,
+                        usageAndChat.second[ChatsTable.autoTranslate],
+                        usageAndChat.second[ChatsTable.darkMode]
+                    ), parseMode = ParseMode.MARKDOWN,
+                    disableWebPagePreview = true,
+                    replyMarkup = InlineKeyboardMarkup.create(
+                        listOf(
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
+                                else "Включить автоперевод",
+                                switchTranslatorId
+                            ),
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
+                                else "Включить Jailbreak",
+                                switchJailbreakId
+                            )
+                        )
+                    )
+                )
+            }
+            callbackQuery(switchJailbreakId) {
+                val message = this.callbackQuery.message ?: throw IllegalStateException()
+                val usageAndChat = transaction {
+                    val newJailbreakMode =
+                        !ChatsTable.select { ChatsTable.id eq message.chat.id }.single()[ChatsTable.darkMode]
+                    ChatsTable.update({ ChatsTable.id eq message.chat.id }) {
+                        it[darkMode] = newJailbreakMode
+                    }
+                    getUsage(message)
+                }
+
+                bot.editMessageText(
+                    chatId = ChatId.fromId(message.chat.id),
+                    messageId = message.messageId,
+                    text = Messages.settings(
+                        usageAndChat.first,
+                        usageAndChat.second[ChatsTable.autoTranslate],
+                        usageAndChat.second[ChatsTable.darkMode]
+                    ),
                     parseMode = ParseMode.MARKDOWN,
                     disableWebPagePreview = true,
                     replyMarkup = InlineKeyboardMarkup.create(
@@ -125,6 +174,11 @@ class BotPoller(
                                 if (usageAndChat.second[ChatsTable.autoTranslate]) "Отключить автоперевод"
                                 else "Включить автоперевод",
                                 switchTranslatorId
+                            ),
+                            InlineKeyboardButton.CallbackData(
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
+                                else "Включить Jailbreak",
+                                switchJailbreakId
                             )
                         )
                     )
@@ -173,7 +227,11 @@ class BotPoller(
             bot.editMessageText(
                 chatId = ChatId.fromId(message.chat.id),
                 messageId = this,
-                text = Messages.settings(usageAndChat.first, usageAndChat.second[ChatsTable.autoTranslate]),
+                text = Messages.settings(
+                    usageAndChat.first,
+                    usageAndChat.second[ChatsTable.autoTranslate],
+                    usageAndChat.second[ChatsTable.darkMode]
+                ),
                 replyMarkup = null,
                 parseMode = ParseMode.MARKDOWN,
                 disableWebPagePreview = true

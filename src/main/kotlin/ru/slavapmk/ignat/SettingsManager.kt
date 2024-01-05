@@ -18,20 +18,22 @@ import java.io.IOException
 val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
 class SettingsManager {
-    var proxies = emptyList<String>()
-        private set
-
-    private var openaiTokens = emptyList<String>()
-
-    var telegramToken: String = ""
-        private set
     var debugMode: Boolean = false
+        private set
+    var jailbreakPrompt: String = "\${PROMPT}"
+        private set
+    var telegramToken: String = ""
         private set
     var enableYandex: Boolean = true
         private set
     var yandexAuthFolder: String = ""
         private set
     private var yandexOauthToken: String = ""
+
+    private var openaiTokens = emptyList<String>()
+    var proxies = emptyList<String>()
+        private set
+
 
     @Transient
     private lateinit var yandexIam: IamTokenResponse
@@ -88,6 +90,7 @@ class SettingsManager {
         yandexAuthFolder = fromJson.yandexAuthFolder
         proxies = fromJson.proxies
         enableYandex = fromJson.enableYandex
+        jailbreakPrompt = fromJson.jailbreakPrompt
 
         api = Retrofit
             .Builder()
