@@ -18,7 +18,13 @@ import java.io.IOException
 val gson: Gson = GsonBuilder().setPrettyPrinting().create()
 
 class SettingsManager {
-    var debugMode: Boolean = false
+    data class Debug(
+        var openai: Boolean = false,
+        var telegram: Boolean = false,
+        var yandex: Boolean = false
+    )
+
+    var debugMode = Debug(openai = false, telegram = false)
         private set
     var jailbreakPrompt: String = "\${PROMPT}"
         private set
@@ -99,7 +105,7 @@ class SettingsManager {
                     .Builder()
                     .addInterceptor(
                         with(HttpLoggingInterceptor()) {
-                            level = when (debugMode) {
+                            level = when (debugMode.yandex) {
                                 true -> HttpLoggingInterceptor.Level.BODY
                                 false -> HttpLoggingInterceptor.Level.NONE
                             }

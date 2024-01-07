@@ -29,7 +29,7 @@ class BotPoller(
     private val settings: SettingsManager,
 ) {
     val bot: Bot = bot {
-        logLevel = when (settings.debugMode) {
+        logLevel = when (settings.debugMode.telegram) {
             true -> LogLevel.All()
             false -> LogLevel.Error
         }

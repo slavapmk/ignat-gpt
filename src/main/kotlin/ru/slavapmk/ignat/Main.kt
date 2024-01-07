@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 
 
 val settingsManager = SettingsManager()
-val translator by lazy { Translator(settingsManager.debugMode) }
+val translator by lazy { Translator(settingsManager.debugMode.yandex) }
 
 suspend fun main() {
     if (!settingsManager.readOrInit() || settingsManager.openaiToken.isEmpty() || settingsManager.telegramToken.isEmpty()) {
@@ -40,7 +40,7 @@ suspend fun main() {
             with(HttpLoggingInterceptor {
                 println("OPENAI  >>  $it")
             }) {
-                level = when (settingsManager.debugMode) {
+                level = when (settingsManager.debugMode.openai) {
                     true -> HttpLoggingInterceptor.Level.BODY
                     false -> HttpLoggingInterceptor.Level.NONE
                 }
