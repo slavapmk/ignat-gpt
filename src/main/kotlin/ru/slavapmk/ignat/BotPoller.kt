@@ -51,6 +51,7 @@ class BotPoller(
                 )
             }
             command("profile") {
+                hideSettings(message)
                 val usageAndChat = transaction {
                     getUsage(message)
                 }
@@ -86,6 +87,7 @@ class BotPoller(
                 }
             }
             command("help") {
+                hideSettings(message)
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
                     helpMessage,
@@ -94,6 +96,7 @@ class BotPoller(
                 )
             }
             command("start") {
+                hideSettings(message)
                 bot.sendMessage(
                     ChatId.fromId(message.chat.id),
                     helpMessage,
