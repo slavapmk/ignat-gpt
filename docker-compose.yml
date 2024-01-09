@@ -25,9 +25,9 @@ services:
       - ./build:/app/build
       - ./caches:/home/gradle/.gradle/caches
     environment:
-      pg_db: root
       pg_user: root
-      pg_password: bot
+      pg_password: root
+      pg_db: bot
     depends_on:
       db:
         condition: service_healthy
