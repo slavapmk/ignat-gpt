@@ -24,7 +24,8 @@ dependencies {
 
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    implementation("org.xerial:sqlite-jdbc:3.43.0.0")
+    implementation("org.postgresql:postgresql:42.7.1")
+//    implementation("org.xerial:sqlite-jdbc:3.43.0.0")
 
     implementation("com.squareup.retrofit2", "retrofit", "2.9.0")
     implementation("io.reactivex.rxjava3", "rxkotlin", "3.0.1")

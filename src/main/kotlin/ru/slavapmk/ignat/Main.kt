@@ -66,8 +66,10 @@ suspend fun main() {
     val openaiPoller = OpenaiProcessor(httpClient)
 
     Database.connect(
-        url = "jdbc:sqlite:storage/database.sqlite",
-        driver = "org.sqlite.JDBC",
+        url = "jdbc:postgresql://db:5432/${System.getenv("pg_db")}",
+        driver = "org.postgresql.Driver",
+        user = System.getenv("pg_user"),
+        password = System.getenv("pg_password")
     )
     transaction {
         addLogger(StdOutSqlLogger)
