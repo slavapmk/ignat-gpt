@@ -64,6 +64,7 @@ class OpenaiProcessor(httpClient: OkHttpClient) {
                 is UnknownHostException -> retryWait = 5000
                 is JsonSyntaxException -> retryWait = 100
                 is SocketTimeoutException -> retryWait = 100
+                is java.net.SocketException -> retryWait = 500
                 else -> break
             }
         } while (true)
