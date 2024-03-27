@@ -59,7 +59,7 @@ object Messages {
                 if (translator) "сквозной"
                 else "Отключен"
             }",
-            "*JailBreak*: ${
+            "*Режим Баженова*: ${
                 if (jailbreak) "Включен"
                 else "Отключен"
             }",

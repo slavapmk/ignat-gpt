@@ -72,8 +72,8 @@ class BotPoller(
                                 switchTranslatorId
                             ),
                             InlineKeyboardButton.CallbackData(
-                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
-                                else "Включить Jailbreak",
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Баженова"
+                                else "Включить Баженова",
                                 switchJailbreakId
                             )
                         )
@@ -142,8 +142,8 @@ class BotPoller(
                                 switchTranslatorId
                             ),
                             InlineKeyboardButton.CallbackData(
-                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
-                                else "Включить Jailbreak",
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Баженова"
+                                else "Включить Баженова",
                                 switchJailbreakId
                             )
                         )
@@ -179,8 +179,8 @@ class BotPoller(
                                 switchTranslatorId
                             ),
                             InlineKeyboardButton.CallbackData(
-                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Jailbreak"
-                                else "Включить Jailbreak",
+                                if (usageAndChat.second[ChatsTable.darkMode]) "Отключить Баженова"
+                                else "Включить Баженова",
                                 switchJailbreakId
                             )
                         )
